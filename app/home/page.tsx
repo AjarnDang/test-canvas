@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Layout, Menu, Table, Button, Space, Tag, Modal, Input, Tabs } from "antd";
+import { Layout, Menu, Table, Button, Space, Tag, Modal, Input } from "antd";
 import Link from "next/link";
 import {
   SearchOutlined,
@@ -12,78 +12,54 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { formPDFs, catalogPDFs, MockPDF } from "../data/mockPDFs";
+import { catalogPDFs, MockPDF } from "../data/mockPDFs";
 
 const { Header, Content, Footer } = Layout;
-const { TabPane } = Tabs;
 
 const App: React.FC = () => {
   const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<MockPDF | null>(
     null
   );
-  const [activeTabKey, setActiveTabKey] = useState<string>("1");
+  const [searchText, setSearchText] = useState<string>("");
 
   const showPreviewModal = (document: MockPDF) => {
     setSelectedDocument(document);
     setIsPreviewModalVisible(true);
   };
 
-  // Form documents table columns
-  const formColumns: ColumnsType<MockPDF> = [
+  // Filter PDFs based on search text
+  const filteredPDFs = catalogPDFs.filter(pdf => 
+    pdf.title.toLowerCase().includes(searchText.toLowerCase()) ||
+    pdf.filename.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  // Catalog PDFs table columns
+  const columns: ColumnsType<MockPDF> = [
     {
-      title: "ชื่อเอกสาร",
+      title: "ชื่อแคตตาล็อก",
       dataIndex: "title",
       key: "title",
       render: (text) => <a>{text}</a>,
       sorter: (a, b) => a.title.localeCompare(b.title),
     },
     {
-      title: "วันที่สร้าง",
+      title: "ชื่อไฟล์",
+      dataIndex: "filename",
+      key: "filename",
+    },
+    {
+      title: "วันที่เพิ่ม",
       dataIndex: "createdAt",
       key: "createdAt",
       sorter: (a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     },
     {
-      title: "แก้ไขล่าสุด",
-      dataIndex: "updatedAt",
-      key: "updatedAt",
-      sorter: (a, b) =>
-        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-    },
-    {
-      title: "สถานะ",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => {
-        let color = "green";
-        if (status === "draft") {
-          color = "gold";
-        } else if (status === "inactive") {
-          color = "volcano";
-        }
-        return <Tag color={color}>{status.toUpperCase()}</Tag>;
-      },
-      filters: [
-        { text: "Active", value: "active" },
-        { text: "Draft", value: "draft" },
-        { text: "Inactive", value: "inactive" },
-      ],
-      onFilter: (value, record) => record.status.indexOf(value as string) === 0,
-    },
-    {
       title: "ประเภท",
       dataIndex: "type",
       key: "type",
-      filters: [
-        { text: "Registration", value: "registration" },
-        { text: "Application", value: "application" },
-        { text: "Survey", value: "survey" },
-        { text: "Expense", value: "expense" },
-        { text: "Leave", value: "leave" },
-      ],
-      onFilter: (value, record) => record.type.indexOf(value as string) === 0,
+      render: () => <Tag color="blue">แคตตาล็อก</Tag>,
     },
     {
       title: "การจัดการ",
@@ -105,42 +81,6 @@ const App: React.FC = () => {
           <Link href={`/form-builder?id=${record.key}`}>
             <Button type="default" icon={<EditOutlined />}>
               แก้ไข
-            </Button>
-          </Link>
-        </Space>
-      ),
-    },
-  ];
-
-  // Catalog PDFs table columns
-  const catalogColumns: ColumnsType<MockPDF> = [
-    {
-      title: "ชื่อแคตตาล็อก",
-      dataIndex: "title",
-      key: "title",
-      render: (text) => <a>{text}</a>,
-      sorter: (a, b) => a.title.localeCompare(b.title),
-    },
-    {
-      title: "ชื่อไฟล์",
-      dataIndex: "filename",
-      key: "filename",
-    },
-    {
-      title: "วันที่เพิ่ม",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      sorter: (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    },
-    {
-      title: "การจัดการ",
-      key: "action",
-      render: (_, record) => (
-        <Space size="middle">
-          <Link href={`/pdf-viewer?id=${record.key}`}>
-            <Button type="primary" icon={<EyeOutlined />}>
-              ดู PDF
             </Button>
           </Link>
         </Space>
@@ -170,7 +110,6 @@ const App: React.FC = () => {
           items={[
             { key: "1", label: "หน้าหลัก" },
             { key: "2", label: "จัดการเอกสาร" },
-            { key: "3", label: "รายงาน" },
           ]}
           style={{ flex: 1, minWidth: 0 }}
         />
@@ -212,29 +151,24 @@ const App: React.FC = () => {
               enterButton={<SearchOutlined />}
               size="large"
               style={{ maxWidth: 400 }}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={(value) => setSearchText(value)}
             />
           </div>
 
-          <Tabs activeKey={activeTabKey} onChange={setActiveTabKey}>
-            <TabPane tab="แบบฟอร์ม" key="1">
-              <Table
-                columns={formColumns}
-                dataSource={formPDFs}
-                pagination={{ pageSize: 5 }}
-                className="shadow-sm"
-                rowKey="key"
-              />
-            </TabPane>
-            <TabPane tab="แคตตาล็อก" key="2">
-              <Table
-                columns={catalogColumns}
-                dataSource={catalogPDFs}
-                pagination={{ pageSize: 5 }}
-                className="shadow-sm"
-                rowKey="key"
-              />
-            </TabPane>
-          </Tabs>
+          <div className="mb-2 mt-4">
+            <h2 className="text-lg font-semibold">แคตตาล็อกเอกสาร</h2>
+            <p className="text-gray-500">รายการแคตตาล็อกทั้งหมดในระบบ สามารถแก้ไขหรือเพิ่มฟอร์มได้</p>
+          </div>
+          
+          <Table
+            columns={columns}
+            dataSource={filteredPDFs}
+            pagination={{ pageSize: 10 }}
+            className="shadow-sm"
+            rowKey="key"
+          />
         </div>
       </Content>
 
@@ -269,8 +203,8 @@ const App: React.FC = () => {
               <FileTextOutlined style={{ fontSize: 48 }} />
             </div>
             <p className="text-center">
-              คลิกปุ่ม &quot;ดู PDF&quot; เพื่อดูเอกสาร PDF หรือ
-              &quot;แก้ไขฟอร์ม&quot; เพื่อแก้ไขฟอร์มนี้
+              คลิกปุ่ม &quot;ดู PDF&quot; เพื่อดูแคตตาล็อก หรือ
+              &quot;แก้ไขฟอร์ม&quot; เพื่อสร้างฟอร์มสำหรับแคตตาล็อกนี้
             </p>
             
             {/* แสดงรายละเอียดเพิ่มเติมของเอกสาร */}

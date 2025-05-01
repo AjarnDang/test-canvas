@@ -2,14 +2,25 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, pointerWithin } from '@dnd-kit/core';
-import { Layout, Alert, Button } from 'antd';
+import { Layout, Alert, Button, Slider } from 'antd';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Document, Page, pdfjs } from 'react-pdf';
 import { FormSidebar } from './components/FormSidebar';
 import { FormCanvas, DroppedElement } from './components/FormCanvas';
 import { formElements } from './components/FormElements';
-import { formPDFs, MockPDF } from '../data/mockPDFs';
-import { HomeOutlined, EyeOutlined } from '@ant-design/icons';
+import { catalogPDFs, MockPDF } from '../data/mockPDFs';
+import { 
+  HomeOutlined, 
+  EyeOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  EyeInvisibleOutlined,
+  SaveOutlined
+} from '@ant-design/icons';
+
+// ตั้งค่า worker ของ PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const { Header, Content, Footer } = Layout;
 
@@ -25,52 +36,50 @@ interface FormData extends MockPDF {
   items: FormItem[];
 }
 
-// Create a map of form data keyed by id using the formPDFs data
-const mockPDFFormsData: Record<string, FormData> = {
-  '1': {
-    ...formPDFs[0],
-    items: [
-      { id: 'text-input-1', type: 'text', label: 'ชื่อ-นามสกุล', position: { x: 20, y: 50 } },
-      { id: 'text-input-2', type: 'text', label: 'อีเมล', position: { x: 250, y: 50 } },
-      { id: 'text-input-3', type: 'text', label: 'เบอร์โทรศัพท์', position: { x: 20, y: 150 } },
-      { id: 'textarea-1', type: 'textarea', label: 'ที่อยู่', position: { x: 250, y: 150 } },
-    ]
-  },
-  '2': {
-    ...formPDFs[1],
-    items: [
-      { id: 'text-input-1', type: 'text', label: 'ชื่อผู้สมัคร', position: { x: 20, y: 50 } },
-      { id: 'text-input-2', type: 'text', label: 'ตำแหน่งที่สมัคร', position: { x: 250, y: 50 } },
-      { id: 'number-input-1', type: 'number', label: 'เงินเดือนที่ต้องการ', position: { x: 20, y: 150 } },
-      { id: 'textarea-1', type: 'textarea', label: 'ประสบการณ์ทำงาน', position: { x: 20, y: 250 } },
-    ]
-  },
-  '3': {
-    ...formPDFs[2],
-    items: [
-      { id: 'text-input-1', type: 'text', label: 'ชื่อผู้ตอบแบบสอบถาม', position: { x: 20, y: 50 } },
-      { id: 'select-1', type: 'select', label: 'ระดับความพึงพอใจ', position: { x: 20, y: 150 } },
-      { id: 'textarea-1', type: 'textarea', label: 'ข้อเสนอแนะ', position: { x: 20, y: 250 } },
-    ]
-  },
-  '4': {
-    ...formPDFs[3],
-    items: [
-      { id: 'text-input-1', type: 'text', label: 'ชื่อผู้เบิก', position: { x: 20, y: 50 } },
-      { id: 'number-input-1', type: 'number', label: 'จำนวนเงิน', position: { x: 250, y: 50 } },
-      { id: 'textarea-1', type: 'textarea', label: 'รายละเอียด', position: { x: 20, y: 150 } },
-    ]
-  },
-  '5': {
-    ...formPDFs[4],
-    items: [
-      { id: 'text-input-1', type: 'text', label: 'ชื่อผู้ลา', position: { x: 20, y: 50 } },
-      { id: 'text-input-2', type: 'text', label: 'แผนก', position: { x: 250, y: 50 } },
-      { id: 'text-input-3', type: 'text', label: 'ประเภทการลา', position: { x: 20, y: 150 } },
-      { id: 'textarea-1', type: 'textarea', label: 'เหตุผลการลา', position: { x: 250, y: 150 } },
-    ]
-  }
+// Create sample form layouts for each catalog PDF
+const defaultFormItems: Record<string, FormItem[]> = {
+  '1': [ // price-list
+    { id: 'text-input-1', type: 'text', label: 'รหัสสินค้า', position: { x: 20, y: 50 } },
+    { id: 'text-input-2', type: 'text', label: 'ชื่อสินค้า', position: { x: 250, y: 50 } },
+    { id: 'number-input-1', type: 'number', label: 'ราคา', position: { x: 20, y: 150 } },
+    { id: 'number-input-2', type: 'number', label: 'จำนวน', position: { x: 250, y: 150 } },
+  ],
+  '2': [ // ALL_NEW_CAMRY_2024
+    { id: 'text-input-1', type: 'text', label: 'รุ่นรถ', position: { x: 20, y: 50 } },
+    { id: 'text-input-2', type: 'text', label: 'สี', position: { x: 250, y: 50 } },
+    { id: 'select-1', type: 'select', label: 'ขนาดเครื่องยนต์', position: { x: 20, y: 150 } },
+    { id: 'number-input-1', type: 'number', label: 'ราคา', position: { x: 250, y: 150 } },
+  ],
+  '3': [ // atto3-th
+    { id: 'text-input-1', type: 'text', label: 'รุ่นรถ', position: { x: 20, y: 50 } },
+    { id: 'text-input-2', type: 'text', label: 'ชื่อผู้จอง', position: { x: 250, y: 50 } },
+    { id: 'number-input-1', type: 'number', label: 'จำนวนเงินจอง', position: { x: 20, y: 150 } },
+    { id: 'date-1', type: 'date', label: 'วันที่จอง', position: { x: 250, y: 150 } },
+  ],
+  '4': [ // Honda-Accord_Catalogue
+    { id: 'text-input-1', type: 'text', label: 'รุ่นรถ', position: { x: 20, y: 50 } },
+    { id: 'select-1', type: 'select', label: 'สี', position: { x: 250, y: 50 } },
+    { id: 'text-input-2', type: 'text', label: 'อุปกรณ์เสริม', position: { x: 20, y: 150 } },
+    { id: 'number-input-1', type: 'number', label: 'ราคา', position: { x: 250, y: 150 } },
+  ],
+  '5': [ // SEALION
+    { id: 'text-input-1', type: 'text', label: 'รหัสรุ่น', position: { x: 20, y: 50 } },
+    { id: 'text-input-2', type: 'text', label: 'ชื่อรุ่น', position: { x: 250, y: 50 } },
+    { id: 'number-input-1', type: 'number', label: 'ความจุแบตเตอรี่', position: { x: 20, y: 150 } },
+    { id: 'number-input-2', type: 'number', label: 'ราคา', position: { x: 250, y: 150 } },
+  ],
 };
+
+// Create a map of form data keyed by id using the catalogPDFs
+const mockPDFFormsData: Record<string, FormData> = {};
+
+// Initialize mockPDFFormsData with catalogPDFs and default form items
+catalogPDFs.forEach(pdf => {
+  mockPDFFormsData[pdf.key] = {
+    ...pdf,
+    items: defaultFormItems[pdf.key] || []
+  };
+});
 
 const FormBuilder: React.FC = () => {
   const [formItems, setFormItems] = useState<FormItem[]>([]);
@@ -79,6 +88,14 @@ const FormBuilder: React.FC = () => {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState<string>('สร้างฟอร์มใหม่');
   const [formId, setFormId] = useState<string | null>(null);
+  
+  // PDF viewer state
+  const [pdfFile, setPdfFile] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1.0);
+  const [showPdf, setShowPdf] = useState<boolean>(true);
+  const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
   
   // Add a ref to track canvas position
   const canvasRef = React.useRef<HTMLDivElement>(null);
@@ -94,8 +111,34 @@ const FormBuilder: React.FC = () => {
       setFormItems(pdfData.items);
       setFormTitle(pdfData.title);
       setFormId(pdfData.key);
+      
+      // Load PDF from catalogPDFs
+      const foundPdf = catalogPDFs.find(pdf => pdf.key === documentId);
+      
+      if (foundPdf) {
+        setIsLoadingPdf(true);
+        setPdfFile(`/pdfs/${foundPdf.filename}`);
+      }
     }
   }, [documentId]);
+
+  // PDF functions
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
+    setNumPages(numPages);
+    setIsLoadingPdf(false);
+  }
+  
+  function zoomIn() {
+    setScale(prevScale => Math.min(prevScale + 0.1, 2.0));
+  }
+
+  function zoomOut() {
+    setScale(prevScale => Math.max(prevScale - 0.1, 0.5));
+  }
+  
+  function togglePdfVisibility() {
+    setShowPdf(prevShow => !prevShow);
+  }
 
   // Initialize DnD only on client-side
   useEffect(() => {
@@ -242,11 +285,45 @@ const FormBuilder: React.FC = () => {
           </Link>
           {documentId && (
             <Link href={`/pdf-viewer?id=${documentId}`}>
-              <Button type="default" icon={<EyeOutlined />}>
+              <Button type="default" icon={<EyeOutlined />} className="mr-2">
                 ดู PDF
               </Button>
             </Link>
           )}
+          {pdfFile && (
+            <Button
+              type="default"
+              icon={showPdf ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+              onClick={togglePdfVisibility}
+              className="mr-2"
+            >
+              {showPdf ? 'ซ่อน PDF' : 'แสดง PDF'}
+            </Button>
+          )}
+          {pdfFile && showPdf && (
+            <>
+              <Button
+                type="default"
+                icon={<ZoomOutOutlined />}
+                onClick={zoomOut}
+                className="mr-2"
+              />
+              <span className="text-white mr-2">{Math.round(scale * 100)}%</span>
+              <Button
+                type="default"
+                icon={<ZoomInOutlined />}
+                onClick={zoomIn}
+                className="mr-2"
+              />
+            </>
+          )}
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={() => alert('บันทึกฟอร์มสำเร็จ!')}
+          >
+            บันทึกฟอร์ม
+          </Button>
         </div>
       </Header>
       <Content className="p-6">
@@ -274,10 +351,49 @@ const FormBuilder: React.FC = () => {
                   {formId && <div className="text-gray-500">ID: {formId}</div>}
                 </div>
                 <div ref={canvasRef} className="relative" style={{ height: '600px', overflow: 'hidden' }}>
-                  <FormCanvas>
+                  {pdfFile && showPdf && (
+                    <div className="absolute inset-0 flex justify-center items-center pointer-events-none z-0">
+                      <div className="relative w-full h-full flex justify-center items-center">
+                        <Document
+                          file={pdfFile}
+                          onLoadSuccess={onDocumentLoadSuccess}
+                          loading={
+                            <div className="flex justify-center items-center h-full">
+                              {isLoadingPdf && "กำลังโหลด PDF..."}
+                            </div>
+                          }
+                          className="h-full"
+                        >
+                          <Page
+                            pageNumber={pageNumber}
+                            scale={scale}
+                            renderTextLayer={false}
+                            renderAnnotationLayer={false}
+                            className="shadow-md"
+                          />
+                        </Document>
+                      </div>
+                    </div>
+                  )}
+                  <FormCanvas hasPdfBackground={!!(pdfFile && showPdf)}>
                     {formItems.length === 0 ? emptyCanvasContent : formItemsContent}
                   </FormCanvas>
                 </div>
+                {pdfFile && showPdf && numPages && (
+                  <div className="mt-2 flex justify-center">
+                    <div className="flex items-center">
+                      <span>หน้า</span>
+                      <Slider
+                        min={1}
+                        max={numPages}
+                        value={pageNumber}
+                        onChange={setPageNumber}
+                        style={{ width: '200px', margin: '0 10px' }}
+                      />
+                      <span>{pageNumber} / {numPages}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <DragOverlay>

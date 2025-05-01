@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Button, Layout, Alert, Spin, Card, List, Result } from 'antd';
 import { FilePdfOutlined, CheckCircleOutlined, HomeOutlined } from '@ant-design/icons';
 import Link from 'next/link';
-import { samplePDFs } from '../data/mockPDFs';
+import { catalogPDFs } from '../data/mockPDFs';
 
 const { Header, Content, Footer } = Layout;
 
@@ -13,7 +13,7 @@ const GeneratePDFPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const mockPDFs = samplePDFs;
+  const mockPDFs = catalogPDFs;
 
   const generatePDFs = async () => {
     setLoading(true);

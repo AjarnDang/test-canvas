@@ -6,17 +6,27 @@ import { useDraggable } from "@dnd-kit/core";
 
 interface FormCanvasProps {
   children: React.ReactNode;
+  hasPdfBackground?: boolean;
 }
 
-export const FormCanvas: React.FC<FormCanvasProps> = ({ children }) => {
+export const FormCanvas: React.FC<FormCanvasProps> = ({ 
+  children, 
+  hasPdfBackground = false 
+}) => {
   const { setNodeRef } = useDroppable({
     id: "form-canvas",
   });
 
+  const canvasClasses = `w-full h-full ${
+    hasPdfBackground 
+      ? "bg-transparent" 
+      : "bg-white border-2 border-dashed border-gray-300"
+  } rounded-lg relative`;
+
   return (
     <div
       ref={setNodeRef}
-      className="w-full h-full bg-white border-2 border-dashed border-gray-300 rounded-lg relative"
+      className={canvasClasses}
       suppressHydrationWarning
     >
       {children}
@@ -41,7 +51,7 @@ export const DroppedElement: React.FC<{
       position: "absolute",
       top: position?.y || 0,
       left: position?.x || 0,
-      zIndex: isDragging ? 1000 : 1, // Higher z-index when dragging
+      zIndex: isDragging ? 1000 : 10, // Higher z-index to ensure visibility over PDF
       width: "calc(100% - 20px)",
       maxWidth: "180px",
       transform: transform
@@ -56,7 +66,7 @@ export const DroppedElement: React.FC<{
   const formHandle = useMemo(
     () => (
       <div
-        className="mb-1 px-2 py-1 bg-gray-100 rounded cursor-move flex justify-between items-center"
+        className="mb-1 px-2 py-1 bg-blue-100 rounded cursor-move flex justify-between items-center"
         {...listeners}
         {...attributes}
         suppressHydrationWarning
@@ -75,7 +85,7 @@ export const DroppedElement: React.FC<{
         <div
           ref={setNodeRef}
           style={style}
-          className="mb-4 p-2 border border-gray-200 rounded-lg bg-white"
+          className="mb-4 p-2 border border-gray-200 rounded-lg bg-white/95 backdrop-blur-sm shadow-md"
           suppressHydrationWarning
         >
           {formHandle}
