@@ -207,6 +207,10 @@ const FormBuilder: React.FC = () => {
   const [scale, setScale] = useState<number>(1.0);
   const [showPdf, setShowPdf] = useState<boolean>(true);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
+  const [pdfDimensions, setPdfDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   // Add a ref to track canvas position
   const canvasRef = React.useRef<HTMLDivElement>(null);
@@ -237,7 +241,23 @@ const FormBuilder: React.FC = () => {
   // PDF functions
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
+    setPageNumber(1);
     setIsLoadingPdf(false);
+
+    // Try to get the actual PDF dimensions from the rendered page
+    setTimeout(() => {
+      const pageElement = document.querySelector(".react-pdf__Page");
+      if (pageElement) {
+        const { width, height } = pageElement.getBoundingClientRect();
+        if (width > 0 && height > 0) {
+          // Store the actual dimensions (unscaled)
+          setPdfDimensions({
+            width: width / scale,
+            height: height / scale,
+          });
+        }
+      }
+    }, 500); // Give it time to render
   }
 
   function zoomIn() {
@@ -300,7 +320,10 @@ const FormBuilder: React.FC = () => {
           );
           posY = Math.max(
             0,
-            Math.min(mouseY - canvas.top - 20, canvas.height - 50)
+            Math.min(
+              mouseY - canvas.top - 20 + window.scrollY, 
+              Math.max(canvas.height, pdfDimensions?.height || 0) * scale - 50
+            )
           );
         }
 
@@ -394,12 +417,12 @@ const FormBuilder: React.FC = () => {
   );
 
   return (
-    <Layout>
+    <Layout style={{ minHeight: "100vh", height: "auto", overflow: "visible" }}>
       <Header
         style={{
           position: "sticky",
           top: 0,
-          zIndex: 1,
+          zIndex: 9999,
           width: "100%",
           display: "flex",
           alignItems: "center",
@@ -459,7 +482,7 @@ const FormBuilder: React.FC = () => {
           </Button>
         </div>
       </Header>
-      <Content className="p-6">
+      <Content className="p-6" style={{ height: "auto", overflow: "visible" }}>
         {documentId && !(documentId in mockPDFFormsData) && (
           <Alert
             message="ไม่พบข้อมูลเอกสาร"
@@ -475,33 +498,35 @@ const FormBuilder: React.FC = () => {
             collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            autoScroll={true}
           >
             <div className="flex justify-between items-center mb-4">
-                  <h1 className="text-2xl font-bold">{formTitle}</h1>
-                  {formId && <div className="text-gray-500">ID: {formId}</div>}
-                </div>
+              <h1 className="text-2xl font-bold">{formTitle}</h1>
+              {formId && <div className="text-gray-500">ID: {formId}</div>}
+            </div>
 
-            <div className="flex min-h-screen bg-white rounded-lg">
+            <div className="flex min-h-screen rounded-lg">
               <FormSidebar />
-              <div className="flex-1">
-                
-                <div
-                  ref={canvasRef}
-                  className="relative"
-                  style={{ height: "600px", overflow: "hidden" }}
+              <div className="flex-1 overflow-visible">
+                <div 
+                  ref={canvasRef} 
+                  className="relative overflow-visible" 
+                  style={{ 
+                    minHeight: "600px", 
+                    height: pdfDimensions && showPdf ? "auto" : "600px"
+                  }}
                 >
                   {pdfFile && showPdf && (
-                    <div className="absolute inset-0 flex justify-center items-center pointer-events-none z-0">
-                      <div className="relative w-full h-full flex justify-center items-center">
+                    <div className="flex justify-center items-start pointer-events-none z-0">
+                      <div className="relative w-full flex justify-center">
                         <Document
                           file={pdfFile}
                           onLoadSuccess={onDocumentLoadSuccess}
                           loading={
-                            <div className="flex justify-center items-center h-full">
+                            <div className="flex justify-center items-center h-[600px]">
                               {isLoadingPdf && "กำลังโหลด PDF..."}
                             </div>
                           }
-                          className="h-full"
                         >
                           <Page
                             pageNumber={pageNumber}
@@ -514,7 +539,11 @@ const FormBuilder: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  <FormCanvas hasPdfBackground={!!(pdfFile && showPdf)}>
+                  <FormCanvas
+                    hasPdfBackground={!!(pdfFile && showPdf)}
+                    pdfDimensions={pdfDimensions || undefined}
+                    scale={scale}
+                  >
                     {formItems.length === 0
                       ? emptyCanvasContent
                       : formItemsContent}
@@ -557,9 +586,6 @@ const FormBuilder: React.FC = () => {
           </div>
         )}
       </Content>
-      <Footer style={{ textAlign: "center" }}>
-        PDF Form Builder ©{new Date().getFullYear()}
-      </Footer>
     </Layout>
   );
 };

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { CSSProperties, useMemo, useState } from "react";
+import React, {
+  CSSProperties,
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { FiMove } from "react-icons/fi";
@@ -8,15 +14,134 @@ import { FiMove } from "react-icons/fi";
 interface FormCanvasProps {
   children: React.ReactNode;
   hasPdfBackground?: boolean;
+  pdfDimensions?: { width: number; height: number };
+  scale?: number;
 }
 
 export const FormCanvas: React.FC<FormCanvasProps> = ({
   children,
   hasPdfBackground = false,
+  pdfDimensions,
+  scale = 1,
 }) => {
   const { setNodeRef } = useDroppable({
     id: "form-canvas",
   });
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [pdfRect, setPdfRect] = useState<{
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+  }>({
+    width: 0,
+    height: 0,
+    top: 0,
+    left: 0,
+  });
+
+  // Monitor window resize and zoom level changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvasRef.current) {
+        // Find the PDF element to get exact dimensions
+        const pdfPage = document.querySelector('.react-pdf__Page');
+        
+        if (pdfPage && pdfDimensions) {
+          // Get the actual rendered PDF dimensions
+          const pdfRect = pdfPage.getBoundingClientRect();
+          const canvasContainer = canvasRef.current.parentElement;
+          
+          if (canvasContainer) {
+            const containerRect = canvasContainer.getBoundingClientRect();
+            
+            // Calculate the scaling based on actual PDF dimensions
+            const newScale = scale;
+            
+            // Set PDF rect to match the actual PDF element position
+            setPdfRect({
+              width: pdfRect.width,
+              height: pdfRect.height,
+              top: pdfRect.top - containerRect.top,
+              left: pdfRect.left - containerRect.left,
+            });
+            
+            setCanvasScale(newScale);
+          }
+        } else {
+          // Fallback if PDF element isn't found
+          const containerWidth = canvasRef.current.parentElement?.clientWidth || window.innerWidth;
+          
+          let newScale = 1;
+          
+          if (pdfDimensions) {
+            // For width, calculate optimal scale to fit PDF width in container
+            const widthScale = containerWidth / pdfDimensions.width;
+            
+            // Use the width scale, allow height to scroll
+            newScale = widthScale * scale;
+            
+            // Calculate PDF rectangle within container
+            const scaledWidth = pdfDimensions.width * newScale;
+            const scaledHeight = pdfDimensions.height * newScale;
+            
+            // Center the PDF horizontally
+            const left = (containerWidth - scaledWidth) / 2;
+            
+            setPdfRect({
+              width: scaledWidth,
+              height: scaledHeight,
+              top: 0, // Top aligned for scrolling
+              left: left,
+            });
+          } else {
+            // Calculate a scale factor based on a reference width if no PDF dimensions
+            const referenceWidth = 1200;
+            newScale = Math.min(containerWidth / referenceWidth, 1.5) * scale;
+            setCanvasScale(newScale);
+          }
+        }
+      }
+    };
+
+    // Call handleResize immediately
+    handleResize();
+    
+    // Create a MutationObserver to detect when the PDF is rendered
+    const observer = new MutationObserver((mutations) => {
+      const pdfPageRendered = mutations.some(mutation => 
+        Array.from(mutation.addedNodes).some(node => 
+          node instanceof Element && node.classList.contains('react-pdf__Page')
+        )
+      );
+      
+      if (pdfPageRendered) {
+        // Allow a moment for the PDF to fully render
+        setTimeout(handleResize, 50);
+      }
+    });
+    
+    // Start observing the document body
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Add event listeners
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    window.addEventListener("wheel", (e) => {
+      if (e.ctrlKey) {
+        handleResize();
+      }
+    });
+    
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+      window.removeEventListener("wheel", handleResize);
+    };
+  }, [pdfDimensions, scale]);
 
   const canvasClasses = `w-full h-full ${
     hasPdfBackground
@@ -24,9 +149,72 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
       : "bg-white border-2 border-dashed border-gray-300"
   } rounded-lg relative`;
 
+  // Get the canvas style based on PDF dimensions
+  const canvasStyle = useMemo(() => {
+    if (!hasPdfBackground || !pdfDimensions) {
+      return {
+        position: "relative" as const,
+        width: "100%",
+        height: "100%",
+      };
+    }
+    
+    return {
+      width: "100%",
+      height: "100%",
+      position: "absolute" as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      pointerEvents: "none" as const,
+    };
+  }, [hasPdfBackground, pdfDimensions]);
+
+  // Create a positioned container for the PDF area only
+  const pdfAreaStyle = useMemo(() => {
+    if (!hasPdfBackground || !pdfDimensions) {
+      return {};
+    }
+    
+    return {
+      position: "absolute" as const,
+      width: `${pdfRect.width}px`,
+      height: `${pdfRect.height}px`,
+      top: `${pdfRect.top}px`,
+      left: `${pdfRect.left}px`,
+      background: "transparent",
+      pointerEvents: "all" as const,
+      zIndex: 10,
+    };
+  }, [hasPdfBackground, pdfDimensions, pdfRect]);
+
   return (
-    <div ref={setNodeRef} className={canvasClasses} suppressHydrationWarning>
-      {children}
+    <div
+      ref={(node) => {
+        // Combine refs
+        setNodeRef(node);
+        if (canvasRef.current !== node) {
+          canvasRef.current = node as HTMLDivElement | null;
+        }
+      }}
+      className={canvasClasses}
+      suppressHydrationWarning
+      style={canvasStyle}
+      data-scale={canvasScale}
+    >
+      {hasPdfBackground && pdfDimensions ? (
+        <div
+          className="pdf-form-area"
+          style={pdfAreaStyle}
+          data-pdf-width={pdfRect.width}
+          data-pdf-height={pdfRect.height}
+        >
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </div>
   );
 };
@@ -36,17 +224,17 @@ const CheckboxOptions: React.FC<{ id: string }> = ({ id }) => {
   const [options, setOptions] = useState([
     "ตัวเลือกที่ 1",
     "ตัวเลือกที่ 2",
-    "ตัวเลือกที่ 3"
+    "ตัวเลือกที่ 3",
   ]);
-  
+
   const addOption = () => {
     setOptions([...options, `ตัวเลือกที่ ${options.length + 1}`]);
   };
-  
+
   const removeOption = (index: number) => {
     setOptions(options.filter((_, i) => i !== index));
   };
-  
+
   return (
     <>
       {options.map((option, index) => (
@@ -59,10 +247,13 @@ const CheckboxOptions: React.FC<{ id: string }> = ({ id }) => {
             value={option}
             title={option}
           />
-          <label htmlFor={`checkbox-${id}-${index}`} className="ml-2 w-full min-w-fit">
+          <label
+            htmlFor={`checkbox-${id}-${index}`}
+            className="ml-2 w-full min-w-fit"
+          >
             {option}
           </label>
-          <button 
+          <button
             type="button"
             onClick={() => removeOption(index)}
             className="text-red-500 ml-2 hover:text-red-700"
@@ -94,21 +285,106 @@ export const DroppedElement: React.FC<{
       id: `dropped-${id}`,
     });
 
+  const [parentScale, setParentScale] = useState(1);
+  const [pdfDimensions, setPdfDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
+
+  // Get the canvas scale and PDF dimensions from parent elements
+  useEffect(() => {
+    const updateFromParent = () => {
+      if (elementRef.current) {
+        // Try to find the FormCanvas parent
+        let parent = elementRef.current.parentElement;
+        let pdfAreaElement = null;
+
+        while (parent) {
+          if (parent.hasAttribute("data-scale")) {
+            const scale = parseFloat(parent.getAttribute("data-scale") || "1");
+            setParentScale(scale);
+          }
+
+          if (parent.classList.contains("pdf-form-area")) {
+            pdfAreaElement = parent;
+          }
+
+          parent = parent.parentElement;
+        }
+
+        // Get PDF dimensions if available
+        if (pdfAreaElement) {
+          const width = parseFloat(
+            pdfAreaElement.getAttribute("data-pdf-width") || "0"
+          );
+          const height = parseFloat(
+            pdfAreaElement.getAttribute("data-pdf-height") || "0"
+          );
+
+          if (width && height) {
+            setPdfDimensions({ width, height });
+          }
+        }
+      }
+    };
+
+    updateFromParent();
+
+    // Add resize listener to recalculate on window resize
+    window.addEventListener("resize", updateFromParent);
+    return () => {
+      window.removeEventListener("resize", updateFromParent);
+    };
+  }, []);
+
+  // Adjust position based on parent scale and constrain to PDF area
+  const adjustedPosition = useMemo(() => {
+    if (!position) return { x: 0, y: 0 };
+
+    let posX = position.x * parentScale;
+    let posY = position.y * parentScale;
+
+    // Constrain to PDF dimensions if available
+    if (pdfDimensions) {
+      posX = Math.max(
+        0,
+        Math.min(posX, pdfDimensions.width - 180 * parentScale)
+      ); // 180px is approx maxWidth
+      posY = Math.max(
+        0,
+        Math.min(posY, pdfDimensions.height - 50 * parentScale)
+      ); // 50px is approx height
+    }
+
+    return { x: posX, y: posY };
+  }, [position?.x, position?.y, parentScale, pdfDimensions]);
+
   // Use useMemo to create a stable reference for the style object
   const style = useMemo<CSSProperties>(
     () => ({
       position: "absolute",
-      top: position?.y || 0,
-      left: position?.x || 0,
+      top: adjustedPosition.y,
+      left: adjustedPosition.x,
       zIndex: isDragging ? 1000 : 10, // Higher z-index to ensure visibility over PDF
       width: "calc(100% - 20px)",
-      maxWidth: "180px",
+      maxWidth: `${180 * parentScale}px`, // Scale the max width
       transform: transform
         ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
         : undefined,
       opacity: isDragging ? 0.4 : 1, // Lower opacity when dragging to show it's being moved
+      // Add transition for smooth scaling
+      transition: "font-size 0.2s, max-width 0.2s",
+      fontSize: `${14 * parentScale}px`, // Scale the font size
     }),
-    [position?.x, position?.y, transform?.x, transform?.y, isDragging]
+    [
+      adjustedPosition.x,
+      adjustedPosition.y,
+      transform?.x,
+      transform?.y,
+      isDragging,
+      parentScale,
+    ]
   );
 
   // The handle will be the same for all components
@@ -132,13 +408,19 @@ export const DroppedElement: React.FC<{
     const Wrapper = React.memo(
       ({ children }: { children: React.ReactNode }) => (
         <div
-          ref={setNodeRef}
+          ref={(node) => {
+            // Combine refs
+            setNodeRef(node);
+            if (elementRef.current !== node) {
+              elementRef.current = node as HTMLDivElement | null;
+            }
+          }}
           style={style}
           className="mb-4"
           suppressHydrationWarning
         >
           <div className="flex items-end gap-1 justify-between">
-            <div>{children}</div>
+            <div style={{ flex: 1 }}>{children}</div>
             <div>{formHandle}</div>
           </div>
         </div>
