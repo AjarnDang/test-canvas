@@ -1,6 +1,6 @@
 "use client";
 
-import React, { CSSProperties, useMemo } from "react";
+import React, { CSSProperties, useMemo, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { FiMove } from "react-icons/fi";
@@ -28,6 +28,58 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
     <div ref={setNodeRef} className={canvasClasses} suppressHydrationWarning>
       {children}
     </div>
+  );
+};
+
+// CheckboxOptions component for handling checkbox options with add/remove functionality
+const CheckboxOptions: React.FC<{ id: string }> = ({ id }) => {
+  const [options, setOptions] = useState([
+    "ตัวเลือกที่ 1",
+    "ตัวเลือกที่ 2",
+    "ตัวเลือกที่ 3"
+  ]);
+  
+  const addOption = () => {
+    setOptions([...options, `ตัวเลือกที่ ${options.length + 1}`]);
+  };
+  
+  const removeOption = (index: number) => {
+    setOptions(options.filter((_, i) => i !== index));
+  };
+  
+  return (
+    <>
+      {options.map((option, index) => (
+        <div key={index} className="flex items-center w-full mb-2">
+          <input
+            type="checkbox"
+            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+            id={`checkbox-${id}-${index}`}
+            aria-label={option}
+            value={option}
+            title={option}
+          />
+          <label htmlFor={`checkbox-${id}-${index}`} className="ml-2 w-full min-w-fit">
+            {option}
+          </label>
+          <button 
+            type="button"
+            onClick={() => removeOption(index)}
+            className="text-red-500 ml-2 hover:text-red-700"
+            aria-label="ลบตัวเลือก"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addOption}
+        className="mt-2 px-2 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 rounded flex items-center"
+      >
+        <span className="mr-1">+</span> เพิ่มตัวเลือก
+      </button>
+    </>
   );
 };
 
@@ -203,22 +255,11 @@ export const DroppedElement: React.FC<{
     case "checkbox":
       return (
         <FormElementWrapper>
-          <div className="bg-white/90 p-2 rounded-md">
-            <label htmlFor={`${id}-checkbox`} className="block">
+          <div className="bg-white/90 p-2 rounded-md w-full">
+            <label htmlFor={`${id}-checkbox`} className="block mb-2">
               {label}
             </label>
-            <div className="flex items-center w-full">
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                id={`checkbox-${id}`}
-                aria-label={label}
-                title={label}
-              />
-              <label htmlFor={`${id}-checkbox`} className="ml-2 w-full min-w-fit">
-                {label}
-              </label>
-            </div>
+            <CheckboxOptions id={id} />
           </div>
         </FormElementWrapper>
       );

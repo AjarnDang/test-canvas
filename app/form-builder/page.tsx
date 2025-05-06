@@ -480,10 +480,11 @@ const FormBuilder: React.FC = () => {
                   <h1 className="text-2xl font-bold">{formTitle}</h1>
                   {formId && <div className="text-gray-500">ID: {formId}</div>}
                 </div>
-                
+
             <div className="flex min-h-screen bg-white rounded-lg">
               <FormSidebar />
               <div className="flex-1">
+                
                 <div
                   ref={canvasRef}
                   className="relative"
