@@ -3,32 +3,29 @@
 import React, { CSSProperties, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
+import { FiMove } from "react-icons/fi";
 
 interface FormCanvasProps {
   children: React.ReactNode;
   hasPdfBackground?: boolean;
 }
 
-export const FormCanvas: React.FC<FormCanvasProps> = ({ 
-  children, 
-  hasPdfBackground = false 
+export const FormCanvas: React.FC<FormCanvasProps> = ({
+  children,
+  hasPdfBackground = false,
 }) => {
   const { setNodeRef } = useDroppable({
     id: "form-canvas",
   });
 
   const canvasClasses = `w-full h-full ${
-    hasPdfBackground 
-      ? "bg-transparent" 
+    hasPdfBackground
+      ? "bg-transparent"
       : "bg-white border-2 border-dashed border-gray-300"
   } rounded-lg relative`;
 
   return (
-    <div
-      ref={setNodeRef}
-      className={canvasClasses}
-      suppressHydrationWarning
-    >
+    <div ref={setNodeRef} className={canvasClasses} suppressHydrationWarning>
       {children}
     </div>
   );
@@ -66,13 +63,13 @@ export const DroppedElement: React.FC<{
   const formHandle = useMemo(
     () => (
       <div
-        className="mb-1 px-2 py-1 bg-blue-100 rounded cursor-move flex justify-between items-center"
+        className="p-2 bg-blue-100 rounded-full cursor-move flex justify-between items-center"
         {...listeners}
         {...attributes}
         suppressHydrationWarning
       >
-        <span className="font-medium text-sm">{label}</span>
-        <span className="text-xs text-gray-500">Drag</span>
+        {/* <span className="font-medium text-sm">{label}</span> */}
+        <FiMove className="w-4 h-4" />
       </div>
     ),
     [attributes, listeners, label]
@@ -85,11 +82,13 @@ export const DroppedElement: React.FC<{
         <div
           ref={setNodeRef}
           style={style}
-          className="mb-4 p-2 border border-gray-200 rounded-lg bg-white/95 backdrop-blur-sm shadow-md"
+          className="mb-4"
           suppressHydrationWarning
         >
-          {formHandle}
-          <div className="px-2">{children}</div>
+          <div className="flex items-end gap-1 justify-between">
+            <div>{children}</div>
+            <div>{formHandle}</div>
+          </div>
         </div>
       )
     );
@@ -102,12 +101,11 @@ export const DroppedElement: React.FC<{
     case "text":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-input`}>{label}</label>
           <input
+            id={`${id}-input`}
             type="text"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder={`กรอก${label.toLowerCase()}`}
           />
         </FormElementWrapper>
@@ -115,12 +113,11 @@ export const DroppedElement: React.FC<{
     case "name":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-input`}>{label}</label>
           <input
+            id={`${id}-input`}
             type="text"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="กรอกชื่อ-นามสกุล"
           />
         </FormElementWrapper>
@@ -128,12 +125,11 @@ export const DroppedElement: React.FC<{
     case "email":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-input`}>{label}</label>
           <input
+            id={`${id}-input`}
             type="email"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="example@email.com"
           />
         </FormElementWrapper>
@@ -141,12 +137,11 @@ export const DroppedElement: React.FC<{
     case "phone":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-input`}>{label}</label>
           <input
+            id={`${id}-input`}
             type="tel"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="0xx-xxx-xxxx"
           />
         </FormElementWrapper>
@@ -154,12 +149,11 @@ export const DroppedElement: React.FC<{
     case "number":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-input`}>{label}</label>
           <input
+            id={`${id}-input`}
             type="number"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="กรอกตัวเลข"
           />
         </FormElementWrapper>
@@ -167,11 +161,10 @@ export const DroppedElement: React.FC<{
     case "textarea":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-textarea`}>{label}</label>
           <textarea
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            id={`${id}-textarea`}
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={3}
             placeholder="กรอกข้อความที่นี่"
           />
@@ -180,12 +173,11 @@ export const DroppedElement: React.FC<{
     case "date":
       return (
         <FormElementWrapper>
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            {label}
-          </label>
+          <label htmlFor={`${id}-date`}>{label}</label>
           <input
+            id={`${id}-date`}
             type="date"
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             title={label}
             placeholder={`กรอก${label.toLowerCase()}`}
           />
@@ -194,14 +186,10 @@ export const DroppedElement: React.FC<{
     case "select":
       return (
         <FormElementWrapper>
-          <label
-            className="block mb-2 text-sm font-medium text-gray-700"
-            id={`select-label-${id}`}
-          >
-            {label}
-          </label>
+          <label htmlFor={`${id}-select`}>{label}</label>
           <select
-            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            id={`${id}-select`}
+            className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-labelledby={`select-label-${id}`}
             title={label}
           >
@@ -215,20 +203,22 @@ export const DroppedElement: React.FC<{
     case "checkbox":
       return (
         <FormElementWrapper>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-              id={`checkbox-${id}`}
-              aria-label={label}
-              title={label}
-            />
-            <label
-              className="ml-2 text-sm font-medium text-gray-700"
-              htmlFor={`checkbox-${id}`}
-            >
+          <div className="bg-white/90 p-2 rounded-md">
+            <label htmlFor={`${id}-checkbox`} className="block">
               {label}
             </label>
+            <div className="flex items-center w-full">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                id={`checkbox-${id}`}
+                aria-label={label}
+                title={label}
+              />
+              <label htmlFor={`${id}-checkbox`} className="ml-2 w-full min-w-fit">
+                {label}
+              </label>
+            </div>
           </div>
         </FormElementWrapper>
       );
