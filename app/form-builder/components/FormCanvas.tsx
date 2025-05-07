@@ -279,7 +279,8 @@ export const DroppedElement: React.FC<{
   type: string;
   label: string;
   position?: { x: number; y: number };
-}> = ({ id, type, label, position }) => {
+  onDelete?: () => void;
+}> = ({ id, type, label, position, onDelete }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `dropped-${id}`,
@@ -387,20 +388,31 @@ export const DroppedElement: React.FC<{
     ]
   );
 
-  // The handle will be the same for all components
+  // Add delete button to the formHandle
   const formHandle = useMemo(
     () => (
-      <div
-        className="p-2 bg-blue-100 rounded-full cursor-move flex justify-between items-center"
-        {...listeners}
-        {...attributes}
-        suppressHydrationWarning
-      >
-        {/* <span className="font-medium text-sm">{label}</span> */}
-        <FiMove className="w-4 h-4" />
+      <div className="flex items-center">
+        <div
+          className="p-2 bg-blue-100 rounded-full cursor-move flex justify-between items-center"
+          {...listeners}
+          {...attributes}
+          suppressHydrationWarning
+        >
+          <FiMove className="w-4 h-4" />
+        </div>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="ml-1 p-2 bg-red-100 rounded-full hover:bg-red-200 text-red-600"
+            title="ลบรายการนี้"
+          >
+            ✕
+          </button>
+        )}
       </div>
     ),
-    [attributes, listeners, label]
+    [attributes, listeners, onDelete]
   );
 
   // The wrapper for all components - use React.memo to prevent unnecessary re-renders

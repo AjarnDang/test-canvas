@@ -24,165 +24,31 @@ import {
   EyeInvisibleOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
+import { FormItem } from './types';
+import {
+  PageFormItems,
+  saveCurrentPageObjects,
+  restorePageObjects,
+  updatePageObjects,
+  deletePageObjects,
+  deleteFormObject,
+  hasPageObjects,
+  countPageObjects
+} from './utils/pdfFormManager';
+import { defaultFormItems } from "../data/defaultFormItems";
 
 // ตั้งค่า worker ของ PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const { Header, Content, Footer } = Layout;
 
-interface FormItem {
-  id: string;
-  type: string;
-  label: string;
-  position: { x: number; y: number };
-}
-
 // Extend MockPDF to include the items property for form data
-interface FormData extends MockPDF {
+interface ExtendedFormData extends MockPDF {
   items: FormItem[];
 }
 
-// Create sample form layouts for each catalog PDF
-const defaultFormItems: Record<string, FormItem[]> = {
-  "1": [
-    // price-list
-    {
-      id: "text-input-1",
-      type: "text",
-      label: "รหัสสินค้า",
-      position: { x: 20, y: 50 },
-    },
-    {
-      id: "text-input-2",
-      type: "text",
-      label: "ชื่อสินค้า",
-      position: { x: 250, y: 50 },
-    },
-    {
-      id: "number-input-1",
-      type: "number",
-      label: "ราคา",
-      position: { x: 20, y: 150 },
-    },
-    {
-      id: "number-input-2",
-      type: "number",
-      label: "จำนวน",
-      position: { x: 250, y: 150 },
-    },
-  ],
-  "2": [
-    // ALL_NEW_CAMRY_2024
-    {
-      id: "text-input-1",
-      type: "text",
-      label: "รุ่นรถ",
-      position: { x: 20, y: 50 },
-    },
-    {
-      id: "text-input-2",
-      type: "text",
-      label: "สี",
-      position: { x: 250, y: 50 },
-    },
-    {
-      id: "select-1",
-      type: "select",
-      label: "ขนาดเครื่องยนต์",
-      position: { x: 20, y: 150 },
-    },
-    {
-      id: "number-input-1",
-      type: "number",
-      label: "ราคา",
-      position: { x: 250, y: 150 },
-    },
-  ],
-  "3": [
-    // atto3-th
-    {
-      id: "text-input-1",
-      type: "text",
-      label: "รุ่นรถ",
-      position: { x: 20, y: 50 },
-    },
-    {
-      id: "text-input-2",
-      type: "text",
-      label: "ชื่อผู้จอง",
-      position: { x: 250, y: 50 },
-    },
-    {
-      id: "number-input-1",
-      type: "number",
-      label: "จำนวนเงินจอง",
-      position: { x: 20, y: 150 },
-    },
-    {
-      id: "date-1",
-      type: "date",
-      label: "วันที่จอง",
-      position: { x: 250, y: 150 },
-    },
-  ],
-  "4": [
-    // Honda-Accord_Catalogue
-    {
-      id: "text-input-1",
-      type: "text",
-      label: "รุ่นรถ",
-      position: { x: 20, y: 50 },
-    },
-    {
-      id: "select-1",
-      type: "select",
-      label: "สี",
-      position: { x: 250, y: 50 },
-    },
-    {
-      id: "text-input-2",
-      type: "text",
-      label: "อุปกรณ์เสริม",
-      position: { x: 20, y: 150 },
-    },
-    {
-      id: "number-input-1",
-      type: "number",
-      label: "ราคา",
-      position: { x: 250, y: 150 },
-    },
-  ],
-  "5": [
-    // SEALION
-    {
-      id: "text-input-1",
-      type: "text",
-      label: "รหัสรุ่น",
-      position: { x: 20, y: 50 },
-    },
-    {
-      id: "text-input-2",
-      type: "text",
-      label: "ชื่อรุ่น",
-      position: { x: 250, y: 50 },
-    },
-    {
-      id: "number-input-1",
-      type: "number",
-      label: "ความจุแบตเตอรี่",
-      position: { x: 20, y: 150 },
-    },
-    {
-      id: "number-input-2",
-      type: "number",
-      label: "ราคา",
-      position: { x: 250, y: 150 },
-    },
-  ],
-};
-
 // Create a map of form data keyed by id using the catalogPDFs
-const mockPDFFormsData: Record<string, FormData> = {};
+const mockPDFFormsData: Record<string, ExtendedFormData> = {};
 
 // Initialize mockPDFFormsData with catalogPDFs and default form items
 catalogPDFs.forEach((pdf) => {
@@ -193,12 +59,16 @@ catalogPDFs.forEach((pdf) => {
 });
 
 const FormBuilder: React.FC = () => {
-  const [formItems, setFormItems] = useState<FormItem[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // Regular state
   const [isMounted, setIsMounted] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState<string>("สร้างฟอร์มใหม่");
   const [formId, setFormId] = useState<string | null>(null);
+
+  // Form items state - now we use per-page storage
+  const [currentPageItems, setCurrentPageItems] = useState<FormItem[]>([]);
+  const [pageFormItems, setPageFormItems] = useState<PageFormItems>({});
 
   // PDF viewer state
   const [pdfFile, setPdfFile] = useState<string | null>(null);
@@ -224,7 +94,16 @@ const FormBuilder: React.FC = () => {
     if (documentId && documentId in mockPDFFormsData) {
       const pdfData =
         mockPDFFormsData[documentId as keyof typeof mockPDFFormsData];
-      setFormItems(pdfData.items);
+      
+      // Initialize form items for page 1
+      setCurrentPageItems(pdfData.items);
+      
+      // Save items to page 1 in the pageFormItems structure
+      const initialPageItems: PageFormItems = {
+        1: pdfData.items
+      };
+      setPageFormItems(initialPageItems);
+      
       setFormTitle(pdfData.title);
       setFormId(pdfData.key);
 
@@ -237,6 +116,23 @@ const FormBuilder: React.FC = () => {
       }
     }
   }, [documentId]);
+
+  // Handle page changes - save current page items and load new page items
+  useEffect(() => {
+    if (pageNumber) {
+      // First, save the current items before changing
+      if (pageNumber > 0) {
+        setPageFormItems(prevPageItems => 
+          saveCurrentPageObjects(currentPageItems, pageNumber, prevPageItems)
+        );
+      }
+      
+      // Then load items for the new page (if we're not on the initial render)
+      if (Object.keys(pageFormItems).length > 0) {
+        setCurrentPageItems(restorePageObjects(pageNumber, pageFormItems));
+      }
+    }
+  }, [pageNumber]);
 
   // PDF functions
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
@@ -259,6 +155,47 @@ const FormBuilder: React.FC = () => {
       }
     }, 500); // Give it time to render
   }
+
+  // Function to handle page changes
+  const handlePageChange = (newPageNumber: number) => {
+    // Save the current page items before switching
+    const updatedPageItems = saveCurrentPageObjects(
+      currentPageItems,
+      pageNumber,
+      pageFormItems
+    );
+    
+    // Update the page items state
+    setPageFormItems(updatedPageItems);
+    
+    // Load the items for the new page
+    setCurrentPageItems(restorePageObjects(newPageNumber, updatedPageItems));
+    
+    // Change the page number
+    setPageNumber(newPageNumber);
+  };
+
+  // Function to delete an item from the current page
+  const handleDeleteItem = (itemId: string) => {
+    // Update the current page items by filtering out the deleted item
+    const updatedItems = currentPageItems.filter(item => item.id !== itemId);
+    setCurrentPageItems(updatedItems);
+    
+    // Update the page items state
+    setPageFormItems(prevPageItems => 
+      updatePageObjects(pageNumber, updatedItems, prevPageItems)
+    );
+  };
+
+  // Function to check if a page has items
+  const pageHasItems = (page: number) => {
+    return hasPageObjects(page, pageFormItems);
+  };
+
+  // Function to get the count of items on a page
+  const getPageItemCount = (page: number) => {
+    return countPageObjects(page, pageFormItems);
+  };
 
   function zoomIn() {
     setScale((prevScale) => Math.min(prevScale + 0.1, 2.0));
@@ -321,20 +258,28 @@ const FormBuilder: React.FC = () => {
           posY = Math.max(
             0,
             Math.min(
-              mouseY - canvas.top - 20 + window.scrollY, 
+              mouseY - canvas.top - 20 + window.scrollY,
               Math.max(canvas.height, pdfDimensions?.height || 0) * scale - 50
             )
           );
         }
 
         // Add a new item to the form with a unique ID
-        const newFormItem = {
+        const newFormItem: FormItem = {
           ...draggedElement,
           id: `${draggedElement.id}-${Date.now()}`, // Create a unique ID
           position: { x: posX, y: posY },
+          pageNumber: pageNumber, // Associate with the current page
         };
 
-        setFormItems((prevItems) => [...prevItems, newFormItem]);
+        // Update current page items
+        const updatedItems = [...currentPageItems, newFormItem];
+        setCurrentPageItems(updatedItems);
+        
+        // Update page form items
+        setPageFormItems(prevPageItems => 
+          updatePageObjects(pageNumber, updatedItems, prevPageItems)
+        );
       }
     }
 
@@ -343,34 +288,40 @@ const FormBuilder: React.FC = () => {
       const originalId = active.id.toString().replace("dropped-", "");
 
       // Update the position of the dragged element
-      setFormItems((items) =>
-        items.map((item) => {
-          if (item.id === originalId) {
-            return {
-              ...item,
-              position: {
-                x: item.position.x + delta.x,
-                y: item.position.y + delta.y,
-              },
-            };
-          }
-          return item;
-        })
+      const updatedItems = currentPageItems.map((item) => {
+        if (item.id === originalId) {
+          return {
+            ...item,
+            position: {
+              x: item.position.x + delta.x,
+              y: item.position.y + delta.y,
+            },
+          };
+        }
+        return item;
+      });
+      
+      // Update current page items
+      setCurrentPageItems(updatedItems);
+      
+      // Update page form items
+      setPageFormItems(prevPageItems => 
+        updatePageObjects(pageNumber, updatedItems, prevPageItems)
       );
     }
 
     // Reset the draggedItemId
     setDraggedItemId(null);
-  }, []);
+  }, [pageNumber, currentPageItems, pdfDimensions, scale]);
 
   // Find the active element for overlay - memoize to prevent recalculation on each render
   const activeElement = useMemo(() => {
     if (!activeId) return null;
 
     return activeId.toString().startsWith("dropped-")
-      ? formItems.find((item) => `dropped-${item.id}` === activeId)
+      ? currentPageItems.find((item) => `dropped-${item.id}` === activeId)
       : formElements.find((item) => item.id === activeId);
-  }, [activeId, formItems]);
+  }, [activeId, currentPageItems]);
 
   // Memoize the empty state to prevent recreation on each render
   const emptyCanvasContent = useMemo(
@@ -386,7 +337,7 @@ const FormBuilder: React.FC = () => {
   // Filter out the item being dragged to avoid duplication
   const formItemsContent = useMemo(
     () =>
-      formItems
+      currentPageItems
         .filter((item) => item.id !== draggedItemId) // Remove the item being dragged
         .map((item) => (
           <DroppedElement
@@ -395,9 +346,10 @@ const FormBuilder: React.FC = () => {
             type={item.type}
             label={item.label}
             position={item.position}
+            onDelete={() => handleDeleteItem(item.id)}
           />
         )),
-    [formItems, draggedItemId]
+    [currentPageItems, draggedItemId, handleDeleteItem]
   );
 
   // Memoize the drag overlay
@@ -415,6 +367,41 @@ const FormBuilder: React.FC = () => {
       ),
     [activeElement]
   );
+
+  // Create pagination indicator component
+  const PaginationIndicator = useMemo(() => {
+    if (!numPages || numPages <= 1) return null;
+    
+    return (
+      <div className="mt-4 flex justify-center items-center">
+        <div className="flex items-center bg-white rounded-lg shadow px-2 py-1">
+          {Array.from({ length: numPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`mx-1 w-8 h-8 flex items-center justify-center rounded-full ${
+                pageNumber === page
+                  ? 'bg-blue-500 text-white'
+                  : pageHasItems(page)
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+              title={`หน้า ${page}${
+                pageHasItems(page) ? ` (${getPageItemCount(page)} รายการ)` : ''
+              }`}
+            >
+              {page}
+              {pageHasItems(page) && (
+                <span className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full text-xs w-4 h-4 flex items-center justify-center">
+                  {getPageItemCount(page)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }, [numPages, pageNumber, pageFormItems]);
 
   return (
     <Layout style={{ minHeight: "100vh", height: "auto", overflow: "visible" }}>
@@ -544,26 +531,29 @@ const FormBuilder: React.FC = () => {
                     pdfDimensions={pdfDimensions || undefined}
                     scale={scale}
                   >
-                    {formItems.length === 0
+                    {currentPageItems.length === 0
                       ? emptyCanvasContent
                       : formItemsContent}
                   </FormCanvas>
                 </div>
                 {pdfFile && showPdf && numPages && (
-                  <div className="mt-2 flex justify-center">
+                  <div className="mt-2 flex justify-center flex-col items-center">
                     <div className="flex items-center">
                       <span>หน้า</span>
                       <Slider
                         min={1}
                         max={numPages}
                         value={pageNumber}
-                        onChange={setPageNumber}
+                        onChange={handlePageChange}
                         style={{ width: "200px", margin: "0 10px" }}
                       />
                       <span>
                         {pageNumber} / {numPages}
                       </span>
                     </div>
+                    
+                    {/* Show pagination indicator with item counts */}
+                    {PaginationIndicator}
                   </div>
                 )}
               </div>
