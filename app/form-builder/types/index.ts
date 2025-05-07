@@ -15,6 +15,17 @@ export interface FormItem {
   pageNumber?: number; // Optional page number (for multi-page PDFs)
   value?: string | string[] | boolean | number; // Value for form fields
   checkboxOptions?: string[]; // For storing checkbox options
+  config?: {
+    maxLength?: number;
+    placeholder?: string;
+    required?: boolean;
+    pattern?: string;
+    min?: number;
+    max?: number;
+    step?: number;
+    rows?: number;
+    cols?: number;
+  }; // Configuration options for form elements
   options?: {
     [key: string]: string | number | boolean | string[] | Record<string, unknown>;
   }; // Additional options specific to the form element type
