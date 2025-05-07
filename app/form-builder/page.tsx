@@ -99,6 +99,7 @@ const FormBuilder: React.FC = () => {
 
   // Add a ref to track canvas position
   const canvasRef = React.useRef<HTMLDivElement>(null);
+  const pdfFormAreaRef = React.useRef<HTMLDivElement>(null);
 
   // ดึงพารามิเตอร์ id จาก URL
   const searchParams = useSearchParams();
@@ -324,47 +325,49 @@ const FormBuilder: React.FC = () => {
         );
 
         if (draggedElement) {
-          // Get canvas coordinates
-          const canvas = canvasRef.current?.getBoundingClientRect();
+          try {
+            // Get the mouse position from the event
+            const activatorEvent = event.activatorEvent as MouseEvent;
+            
+            // Get PDF area element to calculate position relative to PDF
+            const pdfArea = pdfFormAreaRef.current || document.querySelector(".pdf-form-area");
+            if (!pdfArea) {
+              console.error("PDF area not found");
+              return;
+            }
+            
+            // Get the PDF area's bounds
+            const pdfRect = pdfArea.getBoundingClientRect();
+            
+            // Calculate position directly relative to PDF area
+            // Subtracting the pdf's position from the mouse position gives us coordinates inside the PDF
+            const posX = activatorEvent.clientX - pdfRect.left;
+            const posY = activatorEvent.clientY - pdfRect.top;
+            
+            // We need to divide by the current scale to store positions in the unscaled coordinate system
+            // This is important because the PDF is rendered at a scale, but we store positions at scale=1
+            const adjustedPosX = posX / scale;
+            const adjustedPosY = posY / scale;
+            
+            // Add a new item to the form with a unique ID
+            const newFormItem: FormItem = {
+              ...draggedElement,
+              id: `${draggedElement.id}-${Date.now()}`, // Create a unique ID
+              position: { x: adjustedPosX, y: adjustedPosY },
+              pageNumber: pageNumber, // Associate with the current page
+            };
 
-          // If we have the canvas boundaries, calculate the position relative to the canvas
-          let posX = 10;
-          let posY = 10;
-
-          if (canvas && event.activatorEvent instanceof MouseEvent) {
-            const mouseX = event.activatorEvent.clientX;
-            const mouseY = event.activatorEvent.clientY;
-
-            // Calculate position relative to canvas
-            posX = Math.max(
-              0,
-              Math.min(mouseX - canvas.left - 50, canvas.width - 150)
+            // Update current page items
+            const updatedItems = [...currentPageItems, newFormItem];
+            setCurrentPageItems(updatedItems);
+            
+            // Update page form items
+            setPageFormItems((prevPageItems) =>
+              updatePageObjects(pageNumber, updatedItems, prevPageItems)
             );
-            posY = Math.max(
-              0,
-              Math.min(
-                mouseY - canvas.top - 20 + window.scrollY,
-                Math.max(canvas.height, pdfDimensions?.height || 0) * scale - 50
-              )
-            );
+          } catch (error) {
+            console.error("Error calculating drop position:", error);
           }
-
-          // Add a new item to the form with a unique ID
-          const newFormItem: FormItem = {
-            ...draggedElement,
-            id: `${draggedElement.id}-${Date.now()}`, // Create a unique ID
-            position: { x: posX, y: posY },
-            pageNumber: pageNumber, // Associate with the current page
-          };
-
-          // Update current page items
-          const updatedItems = [...currentPageItems, newFormItem];
-          setCurrentPageItems(updatedItems);
-
-          // Update page form items
-          setPageFormItems((prevPageItems) =>
-            updatePageObjects(pageNumber, updatedItems, prevPageItems)
-          );
         }
       }
 
@@ -372,23 +375,24 @@ const FormBuilder: React.FC = () => {
       if (active.id.toString().startsWith("dropped-")) {
         const originalId = active.id.toString().replace("dropped-", "");
 
-        // Update the position of the dragged element
+        // We need to adjust the delta based on the current scale
+        // The delta is in screen pixels, but our positions are stored in unscaled coordinates
         const updatedItems = currentPageItems.map((item) => {
           if (item.id === originalId) {
             return {
               ...item,
               position: {
-                x: item.position.x + delta.x,
-                y: item.position.y + delta.y,
+                x: item.position.x + delta.x / scale,
+                y: item.position.y + delta.y / scale,
               },
             };
           }
           return item;
         });
-
+        
         // Update current page items
         setCurrentPageItems(updatedItems);
-
+        
         // Update page form items
         setPageFormItems((prevPageItems) =>
           updatePageObjects(pageNumber, updatedItems, prevPageItems)
@@ -398,7 +402,7 @@ const FormBuilder: React.FC = () => {
       // Reset the draggedItemId
       setDraggedItemId(null);
     },
-    [pageNumber, currentPageItems, pdfDimensions, scale]
+    [pageNumber, currentPageItems, scale]
   );
 
   // Find the active element for overlay - memoize to prevent recalculation on each render
@@ -726,6 +730,7 @@ const FormBuilder: React.FC = () => {
                     hasPdfBackground={!!(pdfFile && showPdf)}
                     pdfDimensions={pdfDimensions || undefined}
                     scale={scale}
+                    ref={pdfFormAreaRef}
                   >
                     {currentPageItems.length === 0
                       ? emptyCanvasContent
