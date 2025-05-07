@@ -56,4 +56,22 @@ export const catalogPDFs: MockPDF[] = [
     status: "active",
     type: "catalog"
   },
+  {
+    key: "6",
+    title: "3_Series_Brochure_REV04_LR.pdf.asset.1668171941574",
+    filename: "3_Series_Brochure_REV04_LR.pdf.asset.1668171941574.pdf",
+    createdAt: "2023-10-01",
+    updatedAt: "2023-10-10",
+    status: "active",
+    type: "catalog"
+  },
+  {
+    key: "7",
+    title: "M0052_2558",
+    filename: "M0052_2558.pdf",
+    createdAt: "2023-11-01",
+    updatedAt: "2023-11-10",
+    status: "active",
+    type: "catalog"
+  },
 ];

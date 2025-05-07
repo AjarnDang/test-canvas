@@ -89,6 +89,9 @@ const FormBuilder: React.FC = () => {
   const searchParams = useSearchParams();
   const documentId = searchParams.get("id");
 
+  // Add state for zoom presets
+  const [zoomPreset, setZoomPreset] = useState<string>("100%");
+
   // โหลดข้อมูลเมื่อค่า documentId เปลี่ยนแปลง
   useEffect(() => {
     if (documentId && documentId in mockPDFFormsData) {
@@ -197,13 +200,73 @@ const FormBuilder: React.FC = () => {
     return countPageObjects(page, pageFormItems);
   };
 
+  // Enhanced zoom functions
   function zoomIn() {
-    setScale((prevScale) => Math.min(prevScale + 0.1, 2.0));
+    setScale((prevScale) => {
+      const newScale = Math.min(prevScale + 0.1, 3.0);
+      setZoomPreset(`${Math.round(newScale * 100)}%`);
+      return newScale;
+    });
   }
 
   function zoomOut() {
-    setScale((prevScale) => Math.max(prevScale - 0.1, 0.5));
+    setScale((prevScale) => {
+      const newScale = Math.max(prevScale - 0.1, 0.1);
+      setZoomPreset(`${Math.round(newScale * 100)}%`);
+      return newScale;
+    });
   }
+
+  function fitToScreen() {
+    if (!pdfDimensions || !canvasRef.current) return;
+    
+    const container = canvasRef.current.getBoundingClientRect();
+    const widthRatio = (container.width * 0.9) / pdfDimensions.width;
+    const heightRatio = (container.height * 0.9) / pdfDimensions.height;
+    
+    // Use the smaller ratio to ensure the PDF fits completely
+    const newScale = Math.min(widthRatio, heightRatio);
+    setScale(newScale);
+    setZoomPreset("Fit");
+  }
+
+  function zoomToActualSize() {
+    setScale(1.0);
+    setZoomPreset("100%");
+  }
+
+  // Add keyboard shortcuts for zooming
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only listen for keyboard shortcuts when the form builder is active
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case '=': // Ctrl/Cmd + Plus (=)
+          case '+':
+            e.preventDefault();
+            zoomIn();
+            break;
+          case '-': // Ctrl/Cmd + Minus
+            e.preventDefault();
+            zoomOut();
+            break;
+          case '0': // Ctrl/Cmd + 0
+            e.preventDefault();
+            zoomToActualSize();
+            break;
+          case '\\': // Ctrl/Cmd + \
+            e.preventDefault();
+            fitToScreen();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [pdfDimensions]); // Add dependencies as needed
 
   function togglePdfVisibility() {
     setShowPdf((prevShow) => !prevShow);
@@ -374,7 +437,7 @@ const FormBuilder: React.FC = () => {
     
     return (
       <div className="mt-4 flex justify-center items-center">
-        <div className="flex items-center bg-white rounded-lg shadow px-2 py-1">
+        <div className="flex items-center">
           {Array.from({ length: numPages }, (_, i) => i + 1).map(page => (
             <button
               key={page}
@@ -403,8 +466,34 @@ const FormBuilder: React.FC = () => {
     );
   }, [numPages, pageNumber, pageFormItems]);
 
+  // Update zoom preset dropdown options
+  const zoomOptions = [
+    { value: "Fit", label: "Fit to Screen" },
+    { value: "50%", label: "50%" },
+    { value: "75%", label: "75%" },
+    { value: "100%", label: "100%" },
+    { value: "125%", label: "125%" },
+    { value: "150%", label: "150%" },
+    { value: "200%", label: "200%" },
+  ];
+
+  // Handle zoom preset change
+  const handleZoomChange = (value: string) => {
+    setZoomPreset(value);
+    
+    if (value === "Fit") {
+      fitToScreen();
+    } else {
+      // Extract percentage value
+      const percentage = parseInt(value);
+      if (!isNaN(percentage)) {
+        setScale(percentage / 100);
+      }
+    }
+  };
+
   return (
-    <Layout style={{ minHeight: "100vh", height: "auto", overflow: "visible" }}>
+    <Layout style={{ minHeight: "100vh", height: "auto", overflow: "hidden" }}>
       <Header
         style={{
           position: "sticky",
@@ -449,14 +538,26 @@ const FormBuilder: React.FC = () => {
                 onClick={zoomOut}
                 className="mr-2"
               />
-              <span className="text-white mr-2">
-                {Math.round(scale * 100)}%
-              </span>
+              <div className="px-2 min-w-[60px] text-center">
+                <select 
+                  value={zoomPreset}
+                  onChange={(e) => handleZoomChange(e.target.value)}
+                  className="bg-transparent border-none outline-none cursor-pointer"
+                  aria-label="Zoom level"
+                  title="Zoom level"
+                >
+                  {zoomOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <Button
                 type="default"
                 icon={<ZoomInOutlined />}
                 onClick={zoomIn}
-                className="mr-2"
+                className="ml-2 mr-4"
               />
             </>
           )}
@@ -469,7 +570,7 @@ const FormBuilder: React.FC = () => {
           </Button>
         </div>
       </Header>
-      <Content className="p-6" style={{ height: "auto", overflow: "visible" }}>
+      <Content className="p-6" style={{ height: "auto", overflow: "scroll" }}>
         {documentId && !(documentId in mockPDFFormsData) && (
           <Alert
             message="ไม่พบข้อมูลเอกสาร"
@@ -494,18 +595,21 @@ const FormBuilder: React.FC = () => {
 
             <div className="flex min-h-screen rounded-lg">
               <FormSidebar />
-              <div className="flex-1 overflow-visible">
+              <div className="flex-1 h-full">
                 <div 
                   ref={canvasRef} 
-                  className="relative overflow-visible" 
+                  className="relative w-full h-full"
                   style={{ 
-                    minHeight: "600px", 
-                    height: pdfDimensions && showPdf ? "auto" : "600px"
+                    minHeight: "600px",
+                    flex: 1,
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "flex-start",
                   }}
                 >
                   {pdfFile && showPdf && (
-                    <div className="flex justify-center items-start pointer-events-none z-0">
-                      <div className="relative w-full flex justify-center">
+                    <div className="flex justify-center items-start pointer-events-none z-0 w-full h-full">
+                      <div className="relative flex justify-center w-auto h-auto">
                         <Document
                           file={pdfFile}
                           onLoadSuccess={onDocumentLoadSuccess}
@@ -520,7 +624,8 @@ const FormBuilder: React.FC = () => {
                             scale={scale}
                             renderTextLayer={false}
                             renderAnnotationLayer={false}
-                            className="shadow-md"
+                            className="shadow-md max-w-full"
+                            width={undefined}
                           />
                         </Document>
                       </div>
@@ -537,16 +642,38 @@ const FormBuilder: React.FC = () => {
                   </FormCanvas>
                 </div>
                 {pdfFile && showPdf && numPages && (
-                  <div className="mt-2 flex justify-center flex-col items-center">
+                  <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 flex flex-col items-center bg-white rounded-lg shadow-lg p-2 z-50">
                     <div className="flex items-center">
-                      <span>หน้า</span>
-                      <Slider
-                        min={1}
-                        max={numPages}
-                        value={pageNumber}
-                        onChange={handlePageChange}
-                        style={{ width: "200px", margin: "0 10px" }}
+                      <Button
+                        type="default"
+                        icon={<ZoomOutOutlined />}
+                        onClick={zoomOut}
+                        className="mr-2"
                       />
+                      <div className="px-2 min-w-[60px] text-center">
+                        <select 
+                          value={zoomPreset}
+                          onChange={(e) => handleZoomChange(e.target.value)}
+                          className="bg-transparent border-none outline-none cursor-pointer"
+                          aria-label="ระดับการซูม"
+                          title="ระดับการซูม"
+                        >
+                          {zoomOptions.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button
+                        type="default"
+                        icon={<ZoomInOutlined />}
+                        onClick={zoomIn}
+                        className="ml-2 mr-4"
+                      />
+                      
+                      <span>หน้า </span>
+
                       <span>
                         {pageNumber} / {numPages}
                       </span>

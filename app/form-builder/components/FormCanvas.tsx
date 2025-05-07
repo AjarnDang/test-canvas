@@ -48,60 +48,61 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
       if (canvasRef.current) {
         // Find the PDF element to get exact dimensions
         const pdfPage = document.querySelector('.react-pdf__Page');
+        const canvasContainer = canvasRef.current.parentElement;
+        
+        if (!canvasContainer) return;
+        
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Get container dimensions - this is where our PDF and form elements will sit
+        const containerRect = canvasContainer.getBoundingClientRect();
         
         if (pdfPage && pdfDimensions) {
           // Get the actual rendered PDF dimensions
           const pdfRect = pdfPage.getBoundingClientRect();
-          const canvasContainer = canvasRef.current.parentElement;
           
-          if (canvasContainer) {
-            const containerRect = canvasContainer.getBoundingClientRect();
-            
-            // Calculate the scaling based on actual PDF dimensions
-            const newScale = scale;
-            
-            // Set PDF rect to match the actual PDF element position
-            setPdfRect({
-              width: pdfRect.width,
-              height: pdfRect.height,
-              top: pdfRect.top - containerRect.top,
-              left: pdfRect.left - containerRect.left,
-            });
-            
-            setCanvasScale(newScale);
-          }
+          // We'll use the PDF's actual size as rendered, which already has scale applied
+          // This is important for maintaining correct form element positioning
+          const scaledWidth = pdfRect.width;
+          const scaledHeight = pdfRect.height;
+          
+          // Calculate left position to center the PDF
+          const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
+          
+          // Set PDF rect to match the actual PDF
+          setPdfRect({
+            width: scaledWidth,
+            height: scaledHeight,
+            top: 0, // Top aligned for scrolling
+            left: left,
+          });
+          
+          // We'll use the current scale as is
+          setCanvasScale(scale);
+        } else if (pdfDimensions) {
+          // If we have PDF dimensions but no element yet
+          
+          // Calculate scaled dimensions based on current scale
+          const scaledWidth = pdfDimensions.width * scale;
+          const scaledHeight = pdfDimensions.height * scale;
+          
+          // Calculate left position to center the PDF
+          const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
+          
+          // Set PDF rect
+          setPdfRect({
+            width: scaledWidth,
+            height: scaledHeight,
+            top: 0,
+            left: left,
+          });
+          
+          setCanvasScale(scale);
         } else {
-          // Fallback if PDF element isn't found
-          const containerWidth = canvasRef.current.parentElement?.clientWidth || window.innerWidth;
-          
-          let newScale = 1;
-          
-          if (pdfDimensions) {
-            // For width, calculate optimal scale to fit PDF width in container
-            const widthScale = containerWidth / pdfDimensions.width;
-            
-            // Use the width scale, allow height to scroll
-            newScale = widthScale * scale;
-            
-            // Calculate PDF rectangle within container
-            const scaledWidth = pdfDimensions.width * newScale;
-            const scaledHeight = pdfDimensions.height * newScale;
-            
-            // Center the PDF horizontally
-            const left = (containerWidth - scaledWidth) / 2;
-            
-            setPdfRect({
-              width: scaledWidth,
-              height: scaledHeight,
-              top: 0, // Top aligned for scrolling
-              left: left,
-            });
-          } else {
-            // Calculate a scale factor based on a reference width if no PDF dimensions
-            const referenceWidth = 1200;
-            newScale = Math.min(containerWidth / referenceWidth, 1.5) * scale;
-            setCanvasScale(newScale);
-          }
+          // Fallback if no PDF dimensions available
+          setCanvasScale(scale);
         }
       }
     };
@@ -129,17 +130,25 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
     // Add event listeners
     window.addEventListener("resize", handleResize);
     window.addEventListener("orientationchange", handleResize);
-    window.addEventListener("wheel", (e) => {
-      if (e.ctrlKey) {
-        handleResize();
-      }
+    
+    // Update form canvas when scale changes
+    const scaleObserver = new MutationObserver(() => {
+      handleResize();
     });
+    
+    // Observe the container for size changes (like when scale changes)
+    if (canvasRef.current && canvasRef.current.parentElement) {
+      scaleObserver.observe(canvasRef.current.parentElement, { 
+        attributes: true, 
+        attributeFilter: ['style'] 
+      });
+    }
     
     return () => {
       observer.disconnect();
+      scaleObserver.disconnect();
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("orientationchange", handleResize);
-      window.removeEventListener("wheel", handleResize);
     };
   }, [pdfDimensions, scale]);
 
