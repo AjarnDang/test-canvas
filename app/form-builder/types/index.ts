@@ -13,7 +13,11 @@ export interface FormItem {
   label: string;
   position: { x: number; y: number };
   pageNumber?: number; // Optional page number (for multi-page PDFs)
-  options?: any; // Additional options specific to the form element type
+  value?: string | string[] | boolean | number; // Value for form fields
+  checkboxOptions?: string[]; // For storing checkbox options
+  options?: {
+    [key: string]: string | number | boolean | string[] | Record<string, unknown>;
+  }; // Additional options specific to the form element type
 }
 
 /**

@@ -6,6 +6,7 @@ import React, {
   useState,
   useEffect,
   useRef,
+  ChangeEvent,
 } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
@@ -47,30 +48,26 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
     const handleResize = () => {
       if (canvasRef.current) {
         // Find the PDF element to get exact dimensions
-        const pdfPage = document.querySelector('.react-pdf__Page');
+        const pdfPage = document.querySelector(".react-pdf__Page");
         const canvasContainer = canvasRef.current.parentElement;
-        
+
         if (!canvasContainer) return;
-        
-        // Get viewport dimensions
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
+
         // Get container dimensions - this is where our PDF and form elements will sit
         const containerRect = canvasContainer.getBoundingClientRect();
-        
+
         if (pdfPage && pdfDimensions) {
           // Get the actual rendered PDF dimensions
           const pdfRect = pdfPage.getBoundingClientRect();
-          
+
           // We'll use the PDF's actual size as rendered, which already has scale applied
           // This is important for maintaining correct form element positioning
           const scaledWidth = pdfRect.width;
           const scaledHeight = pdfRect.height;
-          
+
           // Calculate left position to center the PDF
           const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
-          
+
           // Set PDF rect to match the actual PDF
           setPdfRect({
             width: scaledWidth,
@@ -78,19 +75,19 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
             top: 0, // Top aligned for scrolling
             left: left,
           });
-          
+
           // We'll use the current scale as is
           setCanvasScale(scale);
         } else if (pdfDimensions) {
           // If we have PDF dimensions but no element yet
-          
+
           // Calculate scaled dimensions based on current scale
           const scaledWidth = pdfDimensions.width * scale;
           const scaledHeight = pdfDimensions.height * scale;
-          
+
           // Calculate left position to center the PDF
           const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
-          
+
           // Set PDF rect
           setPdfRect({
             width: scaledWidth,
@@ -98,7 +95,7 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
             top: 0,
             left: left,
           });
-          
+
           setCanvasScale(scale);
         } else {
           // Fallback if no PDF dimensions available
@@ -109,41 +106,43 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
 
     // Call handleResize immediately
     handleResize();
-    
+
     // Create a MutationObserver to detect when the PDF is rendered
     const observer = new MutationObserver((mutations) => {
-      const pdfPageRendered = mutations.some(mutation => 
-        Array.from(mutation.addedNodes).some(node => 
-          node instanceof Element && node.classList.contains('react-pdf__Page')
+      const pdfPageRendered = mutations.some((mutation) =>
+        Array.from(mutation.addedNodes).some(
+          (node) =>
+            node instanceof Element &&
+            node.classList.contains("react-pdf__Page")
         )
       );
-      
+
       if (pdfPageRendered) {
         // Allow a moment for the PDF to fully render
         setTimeout(handleResize, 50);
       }
     });
-    
+
     // Start observing the document body
     observer.observe(document.body, { childList: true, subtree: true });
-    
+
     // Add event listeners
     window.addEventListener("resize", handleResize);
     window.addEventListener("orientationchange", handleResize);
-    
+
     // Update form canvas when scale changes
     const scaleObserver = new MutationObserver(() => {
       handleResize();
     });
-    
+
     // Observe the container for size changes (like when scale changes)
     if (canvasRef.current && canvasRef.current.parentElement) {
-      scaleObserver.observe(canvasRef.current.parentElement, { 
-        attributes: true, 
-        attributeFilter: ['style'] 
+      scaleObserver.observe(canvasRef.current.parentElement, {
+        attributes: true,
+        attributeFilter: ["style"],
       });
     }
-    
+
     return () => {
       observer.disconnect();
       scaleObserver.disconnect();
@@ -167,7 +166,7 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
         height: "100%",
       };
     }
-    
+
     return {
       width: "100%",
       height: "100%",
@@ -185,7 +184,7 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
     if (!hasPdfBackground || !pdfDimensions) {
       return {};
     }
-    
+
     return {
       position: "absolute" as const,
       width: `${pdfRect.width}px`,
@@ -229,19 +228,81 @@ export const FormCanvas: React.FC<FormCanvasProps> = ({
 };
 
 // CheckboxOptions component for handling checkbox options with add/remove functionality
-const CheckboxOptions: React.FC<{ id: string }> = ({ id }) => {
-  const [options, setOptions] = useState([
-    "ตัวเลือกที่ 1",
-    "ตัวเลือกที่ 2",
-    "ตัวเลือกที่ 3",
-  ]);
+const CheckboxOptions: React.FC<{
+  id: string;
+  initialValue?: string[];
+  initialOptions?: string[];
+  onChange?: (values: string[], options?: string[]) => void;
+}> = ({ id, initialValue = [], initialOptions, onChange }) => {
+  // Initialize with default or provided options
+  const [options, setOptions] = useState(
+    initialOptions || ["ตัวเลือกที่ 1", "ตัวเลือกที่ 2", "ตัวเลือกที่ 3"]
+  );
+
+  // Track checked values
+  const [checkedValues, setCheckedValues] = useState<string[]>(
+    initialValue || []
+  );
+
+  // When initialValue or initialOptions change, update local state
+  useEffect(() => {
+    setCheckedValues(initialValue || []);
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (initialOptions && initialOptions.length > 0) {
+      setOptions(initialOptions);
+    }
+  }, [initialOptions]);
 
   const addOption = () => {
-    setOptions([...options, `ตัวเลือกที่ ${options.length + 1}`]);
+    const newOptions = [...options, `ตัวเลือกที่ ${options.length + 1}`];
+    setOptions(newOptions);
+    // Notify parent about options change
+    if (onChange) {
+      onChange(checkedValues, newOptions);
+    }
   };
 
   const removeOption = (index: number) => {
-    setOptions(options.filter((_, i) => i !== index));
+    const newOptions = options.filter((_, i) => i !== index);
+
+    // Also remove from checked values if it was checked
+    const removedOption = options[index];
+    let newCheckedValues = [...checkedValues];
+
+    if (checkedValues.includes(removedOption)) {
+      newCheckedValues = checkedValues.filter((v) => v !== removedOption);
+      setCheckedValues(newCheckedValues);
+    }
+
+    setOptions(newOptions);
+
+    // Notify parent with updated options and checked values
+    if (onChange) {
+      onChange(newCheckedValues, newOptions);
+    }
+  };
+
+  const handleCheckboxChange = (
+    e: ChangeEvent<HTMLInputElement>,
+    option: string
+  ) => {
+    const isChecked = e.target.checked;
+    let newCheckedValues: string[];
+
+    if (isChecked) {
+      newCheckedValues = [...checkedValues, option];
+    } else {
+      newCheckedValues = checkedValues.filter((v) => v !== option);
+    }
+
+    setCheckedValues(newCheckedValues);
+
+    // Notify parent with updated checked values and current options
+    if (onChange) {
+      onChange(newCheckedValues, options);
+    }
   };
 
   return (
@@ -255,6 +316,8 @@ const CheckboxOptions: React.FC<{ id: string }> = ({ id }) => {
             aria-label={option}
             value={option}
             title={option}
+            checked={checkedValues.includes(option)}
+            onChange={(e) => handleCheckboxChange(e, option)}
           />
           <label
             htmlFor={`checkbox-${id}-${index}`}
@@ -288,8 +351,23 @@ export const DroppedElement: React.FC<{
   type: string;
   label: string;
   position?: { x: number; y: number };
+  value?: string | string[] | boolean | number;
+  checkboxOptions?: string[];
   onDelete?: () => void;
-}> = ({ id, type, label, position, onDelete }) => {
+  onValueChange?: (
+    value: string | string[] | boolean | number,
+    checkboxOptions?: string[]
+  ) => void;
+}> = ({
+  id,
+  type,
+  label,
+  position,
+  value,
+  checkboxOptions,
+  onDelete,
+  onValueChange,
+}) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `dropped-${id}`,
@@ -300,7 +378,39 @@ export const DroppedElement: React.FC<{
     width: number;
     height: number;
   } | null>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const elementRef = useRef<HTMLDivElement>(null);
+
+  // Local state for input values to prevent cursor jumping
+  const [localValue, setLocalValue] = useState<
+    string | string[] | boolean | number | undefined
+  >(value);
+  // Local state for checkbox options
+  const [localCheckboxOptions, setLocalCheckboxOptions] = useState<
+    string[] | undefined
+  >(checkboxOptions);
+
+  // Update local value when prop value changes (from parent)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  // Update local checkbox options when prop changes
+  useEffect(() => {
+    setLocalCheckboxOptions(checkboxOptions);
+  }, [checkboxOptions]);
+
+  // Track scroll position to adjust elements when page scrolls
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollOffset(window.scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   // Get the canvas scale and PDF dimensions from parent elements
   useEffect(() => {
@@ -370,15 +480,43 @@ export const DroppedElement: React.FC<{
     return { x: posX, y: posY };
   }, [position?.x, position?.y, parentScale, pdfDimensions]);
 
+  // Handle local input value changes
+  const handleLocalInputChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    setLocalValue(e.target.value);
+  };
+
+  // Send value to parent on blur or enter key
+  const handleInputBlur = () => {
+    if (onValueChange && localValue !== value) {
+      onValueChange(
+        localValue as string | string[] | boolean | number,
+        localCheckboxOptions
+      );
+    }
+  };
+
+  const handleKeyDown = (
+    e: React.KeyboardEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur(); // Blur the input to trigger onBlur
+    }
+  };
+
   // Use useMemo to create a stable reference for the style object
   const style = useMemo<CSSProperties>(
     () => ({
       position: "absolute",
       top: adjustedPosition.y,
       left: adjustedPosition.x,
-      zIndex: isDragging ? 1000 : 10, // Higher z-index to ensure visibility over PDF
-      width: "calc(100% - 20px)",
-      maxWidth: `${180 * parentScale}px`, // Scale the max width
+      zIndex: isDragging ? 1000 : 20, // Higher z-index to ensure visibility over PDF
+      // For checkbox, textarea and dropdown, we should use fit-content
+      width: type === "checkbox" ? "fit-content" : "calc(100% - 20px)",
+      maxWidth: type === "checkbox" ? "280px" : `${180 * parentScale}px`, // Scale the max width
       transform: transform
         ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
         : undefined,
@@ -394,6 +532,8 @@ export const DroppedElement: React.FC<{
       transform?.y,
       isDragging,
       parentScale,
+      scrollOffset, // Re-compute when scroll changes
+      type, // Re-compute when type changes
     ]
   );
 
@@ -462,6 +602,10 @@ export const DroppedElement: React.FC<{
             type="text"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder={`กรอก${label.toLowerCase()}`}
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -474,6 +618,10 @@ export const DroppedElement: React.FC<{
             type="text"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="กรอกชื่อ-นามสกุล"
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -486,6 +634,10 @@ export const DroppedElement: React.FC<{
             type="email"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="example@email.com"
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -498,6 +650,10 @@ export const DroppedElement: React.FC<{
             type="tel"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="0xx-xxx-xxxx"
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -510,6 +666,10 @@ export const DroppedElement: React.FC<{
             type="number"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="กรอกตัวเลข"
+            value={(localValue as number) ?? ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -522,6 +682,10 @@ export const DroppedElement: React.FC<{
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={3}
             placeholder="กรอกข้อความที่นี่"
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -535,6 +699,10 @@ export const DroppedElement: React.FC<{
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             title={label}
             placeholder={`กรอก${label.toLowerCase()}`}
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
         </FormElementWrapper>
       );
@@ -547,6 +715,9 @@ export const DroppedElement: React.FC<{
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-labelledby={`select-label-${id}`}
             title={label}
+            value={(localValue as string) || ""}
+            onChange={handleLocalInputChange}
+            onBlur={handleInputBlur}
           >
             <option value="">เลือกตัวเลือก</option>
             <option value="option1">ตัวเลือกที่ 1</option>
@@ -562,7 +733,27 @@ export const DroppedElement: React.FC<{
             <label htmlFor={`${id}-checkbox`} className="block mb-2">
               {label}
             </label>
-            <CheckboxOptions id={id} />
+            <CheckboxOptions
+              id={id}
+              initialValue={Array.isArray(localValue) ? localValue : []}
+              initialOptions={localCheckboxOptions}
+              onChange={(newValues, newOptions) => {
+                setLocalValue(newValues);
+                if (newOptions) {
+                  setLocalCheckboxOptions(newOptions);
+                }
+
+                // Only update parent when there are changes
+                if (
+                  onValueChange &&
+                  (JSON.stringify(newValues) !== JSON.stringify(value) ||
+                    JSON.stringify(newOptions) !==
+                      JSON.stringify(checkboxOptions))
+                ) {
+                  onValueChange(newValues, newOptions);
+                }
+              }}
+            />
           </div>
         </FormElementWrapper>
       );
