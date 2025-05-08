@@ -372,7 +372,6 @@ export const DroppedElement: React.FC<{
   maxLength?: number;
   required?: boolean;
   placeholder?: string;
-  onDelete?: () => void;
   onValueChange?: (
     value: string | string[] | boolean | number,
     checkboxOptions?: string[]
@@ -389,7 +388,6 @@ export const DroppedElement: React.FC<{
   maxLength,
   required = false,
   placeholder = "",
-  onDelete,
   onValueChange,
   onConfigChange,
   onConfigClick,
@@ -621,19 +619,9 @@ export const DroppedElement: React.FC<{
         >
           <FiMove className="w-4 h-4" />
         </div>
-        {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="ml-1 p-2 bg-red-100 rounded-full hover:bg-red-200 text-red-600"
-            title="ลบรายการนี้"
-          >
-            ✕
-          </button>
-        )}
       </div>
     ),
-    [attributes, listeners, onDelete, onConfigClick]
+    [attributes, listeners, onConfigClick]
   );
 
   // The wrapper for all components - use React.memo to prevent unnecessary re-renders
@@ -650,7 +638,7 @@ export const DroppedElement: React.FC<{
               }
             }}
             style={style}
-            className="mb-4"
+            className="min-w-[200px] w-full"
             suppressHydrationWarning
           >
             <div className="flex items-end gap-1 justify-between">
@@ -673,7 +661,7 @@ export const DroppedElement: React.FC<{
                 onClose={handleCloseConfig}
               />
             </div>
-            )}
+          )}
         </>
       )
     );

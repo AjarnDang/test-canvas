@@ -549,7 +549,6 @@ const FormBuilder: React.FC = () => {
             maxLength={item.config?.maxLength}
             required={item.config?.required}
             placeholder={item.config?.placeholder}
-            onDelete={() => handleDeleteItem(item.id)}
             onValueChange={(newValue, checkboxOptions) =>
               handleFormItemValueChange(item.id, newValue, checkboxOptions)
             }
@@ -831,7 +830,7 @@ const FormBuilder: React.FC = () => {
               </div>
               
               {/* Right Config Sidebar */}
-              <div className={`w-80 border-l border-gray-200 bg-white transition-all duration-300 ${configElement ? 'translate-x-0' : 'translate-x-full'}`}>
+              <div className={`transition-all duration-300 ${configElement ? 'translate-x-0' : 'translate-x-full'}`}>
                 {configElement && (
                   <FormElementConfig
                     id={configElement.id}
@@ -841,10 +840,18 @@ const FormBuilder: React.FC = () => {
                     maxLength={configElement.config?.maxLength}
                     required={configElement.config?.required}
                     placeholder={configElement.config?.placeholder}
+                    value={configElement.value}
                     onConfigChange={(configData) => {
                       handleFormElementConfig(configElement.id, configData);
                     }}
+                    onValueChange={(newValue, checkboxOptions) => {
+                      handleFormItemValueChange(configElement.id, newValue, checkboxOptions);
+                    }}
                     onClose={handleCloseConfigPanel}
+                    onDelete={() => {
+                      handleDeleteItem(configElement.id);
+                      handleCloseConfigPanel();
+                    }}
                   />
                 )}
               </div>
