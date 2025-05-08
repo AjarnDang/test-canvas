@@ -34,6 +34,7 @@ import {
   countPageObjects,
 } from "./utils/pdfFormManager";
 import { defaultFormItems } from "../data/defaultFormItems";
+import { FormElementConfig, FormElementConfigData } from "./components/FormElementConfig";
 
 // ตั้งค่า worker ของ PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -111,6 +112,9 @@ const FormBuilder: React.FC = () => {
   // Add state for tracking API call status
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // เพิ่ม state สำหรับเก็บ element ที่กำลังตั้งค่า
+  const [configElement, setConfigElement] = useState<FormItem | null>(null);
 
   // โหลดข้อมูลเมื่อค่า documentId เปลี่ยนแปลง
   useEffect(() => {
@@ -450,6 +454,46 @@ const FormBuilder: React.FC = () => {
     );
   };
 
+  // ปรับปรุงฟังก์ชันเมื่อคลิกที่ปุ่มตั้งค่า
+  const handleOpenConfigPanel = (item: FormItem) => {
+    setConfigElement(item);
+  };
+
+  // ปรับปรุงฟังก์ชันเมื่อปิดแผงตั้งค่า
+  const handleCloseConfigPanel = () => {
+    setConfigElement(null);
+  };
+
+  // Function to handle form element configuration changes
+  const handleFormElementConfig = (itemId: string, configData: FormElementConfigData) => {
+    // Update the current page items with the new configuration
+    const updatedItems = currentPageItems.map((item) => {
+      if (item.id === itemId) {
+        // Create a new item with updated configuration
+        return {
+          ...item,
+          label: configData.label,
+          checkboxOptions: configData.checkboxOptions || item.checkboxOptions,
+          config: {
+            ...(item.config || {}), // Ensure config exists
+            maxLength: configData.maxLength,
+            required: configData.required,
+            placeholder: configData.placeholder,
+          },
+        };
+      }
+      return item;
+    });
+
+    // Update current page items
+    setCurrentPageItems(updatedItems);
+
+    // Update the page items state
+    setPageFormItems((prevPageItems) =>
+      updatePageObjects(pageNumber, updatedItems, prevPageItems)
+    );
+  };
+
   // Save form data to API
   const handleSaveForm = async () => {
     try {
@@ -502,10 +546,15 @@ const FormBuilder: React.FC = () => {
             position={item.position}
             value={item.value}
             checkboxOptions={item.checkboxOptions}
+            maxLength={item.config?.maxLength}
+            required={item.config?.required}
+            placeholder={item.config?.placeholder}
             onDelete={() => handleDeleteItem(item.id)}
-            onValueChange={(newValue, newOptions) =>
-              handleFormItemValueChange(item.id, newValue, newOptions)
+            onValueChange={(newValue, checkboxOptions) =>
+              handleFormItemValueChange(item.id, newValue, checkboxOptions)
             }
+            onConfigChange={(configData) => handleFormElementConfig(item.id, configData)}
+            onConfigClick={() => handleOpenConfigPanel(item)}
           />
         )),
     [currentPageItems, draggedItemId, handleDeleteItem]
@@ -778,6 +827,25 @@ const FormBuilder: React.FC = () => {
                     {/* Show pagination indicator with item counts */}
                     {PaginationIndicator}
                   </div>
+                )}
+              </div>
+              
+              {/* Right Config Sidebar */}
+              <div className={`w-80 border-l border-gray-200 bg-white transition-all duration-300 ${configElement ? 'translate-x-0' : 'translate-x-full'}`}>
+                {configElement && (
+                  <FormElementConfig
+                    id={configElement.id}
+                    type={configElement.type}
+                    label={configElement.label}
+                    checkboxOptions={configElement.checkboxOptions}
+                    maxLength={configElement.config?.maxLength}
+                    required={configElement.config?.required}
+                    placeholder={configElement.config?.placeholder}
+                    onConfigChange={(configData) => {
+                      handleFormElementConfig(configElement.id, configData);
+                    }}
+                    onClose={handleCloseConfigPanel}
+                  />
                 )}
               </div>
             </div>

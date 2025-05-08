@@ -10,7 +10,8 @@ import React, {
 } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
-import { FiMove } from "react-icons/fi";
+import { FiMove, FiSettings } from "react-icons/fi";
+import { FormElementConfig, FormElementConfigData } from "./FormElementConfig";
 
 interface FormCanvasProps {
   children: React.ReactNode;
@@ -48,24 +49,24 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
           // Find the PDF element to get exact dimensions
           const pdfPage = document.querySelector(".react-pdf__Page");
           const canvasContainer = canvasRef.current.parentElement;
-          
+
           if (!canvasContainer) return;
-          
+
           // Get container dimensions - this is where our PDF and form elements will sit
           const containerRect = canvasContainer.getBoundingClientRect();
-          
+
           if (pdfPage && pdfDimensions) {
             // Get the actual rendered PDF dimensions
             const pdfRect = pdfPage.getBoundingClientRect();
-            
+
             // We'll use the PDF's actual size as rendered, which already has scale applied
             // This is important for maintaining correct form element positioning
             const scaledWidth = pdfRect.width;
             const scaledHeight = pdfRect.height;
-            
+
             // Calculate left position to center the PDF
             const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
-            
+
             // Set PDF rect to match the actual PDF
             setPdfRect({
               width: scaledWidth,
@@ -73,19 +74,19 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
               top: 0, // Top aligned for scrolling
               left: left,
             });
-            
+
             // We'll use the current scale as is
             setCanvasScale(scale);
           } else if (pdfDimensions) {
             // If we have PDF dimensions but no element yet
-            
+
             // Calculate scaled dimensions based on current scale
             const scaledWidth = pdfDimensions.width * scale;
             const scaledHeight = pdfDimensions.height * scale;
-            
+
             // Calculate left position to center the PDF
             const left = Math.max(0, (containerRect.width - scaledWidth) / 2);
-            
+
             // Set PDF rect
             setPdfRect({
               width: scaledWidth,
@@ -93,7 +94,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
               top: 0,
               left: left,
             });
-            
+
             setCanvasScale(scale);
           } else {
             // Fallback if no PDF dimensions available
@@ -104,7 +105,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
 
       // Call handleResize immediately
       handleResize();
-      
+
       // Create a MutationObserver to detect when the PDF is rendered
       const observer = new MutationObserver((mutations) => {
         const pdfPageRendered = mutations.some((mutation) =>
@@ -114,33 +115,33 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
               node.classList.contains("react-pdf__Page")
           )
         );
-        
+
         if (pdfPageRendered) {
           // Allow a moment for the PDF to fully render
           setTimeout(handleResize, 50);
         }
       });
-      
+
       // Start observing the document body
       observer.observe(document.body, { childList: true, subtree: true });
-      
+
       // Add event listeners
       window.addEventListener("resize", handleResize);
       window.addEventListener("orientationchange", handleResize);
-      
+
       // Update form canvas when scale changes
       const scaleObserver = new MutationObserver(() => {
         handleResize();
       });
-      
+
       // Observe the container for size changes (like when scale changes)
       if (canvasRef.current && canvasRef.current.parentElement) {
-        scaleObserver.observe(canvasRef.current.parentElement, { 
-          attributes: true, 
+        scaleObserver.observe(canvasRef.current.parentElement, {
+          attributes: true,
           attributeFilter: ["style"],
         });
       }
-      
+
       return () => {
         observer.disconnect();
         scaleObserver.disconnect();
@@ -164,7 +165,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
           height: "100%",
         };
       }
-      
+
       return {
         width: "100%",
         height: "100%",
@@ -182,7 +183,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
       if (!hasPdfBackground || !pdfDimensions) {
         return {};
       }
-      
+
       return {
         position: "absolute" as const,
         width: `${pdfRect.width}px`,
@@ -197,7 +198,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
 
     // Effect to forward the PDF area ref to the parent component
     useEffect(() => {
-      if (typeof ref === 'function') {
+      if (typeof ref === "function") {
         ref(pdfAreaRef.current);
       } else if (ref) {
         ref.current = pdfAreaRef.current;
@@ -209,7 +210,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
         ref={(node) => {
           // Combine refs
           setNodeRef(node);
-          
+
           // Update our local ref
           if (canvasRef.current !== node) {
             canvasRef.current = node as HTMLDivElement | null;
@@ -229,7 +230,7 @@ export const FormCanvas = React.forwardRef<HTMLDivElement, FormCanvasProps>(
             data-pdf-height={pdfRect.height}
             data-scale={scale}
           >
-        {children}
+            {children}
           </div>
         ) : (
           children
@@ -368,11 +369,16 @@ export const DroppedElement: React.FC<{
   position?: { x: number; y: number };
   value?: string | string[] | boolean | number;
   checkboxOptions?: string[];
+  maxLength?: number;
+  required?: boolean;
+  placeholder?: string;
   onDelete?: () => void;
   onValueChange?: (
     value: string | string[] | boolean | number,
     checkboxOptions?: string[]
   ) => void;
+  onConfigChange?: (config: FormElementConfigData) => void;
+  onConfigClick?: () => void;
 }> = ({
   id,
   type,
@@ -380,8 +386,13 @@ export const DroppedElement: React.FC<{
   position,
   value,
   checkboxOptions,
+  maxLength,
+  required = false,
+  placeholder = "",
   onDelete,
   onValueChange,
+  onConfigChange,
+  onConfigClick,
 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -395,6 +406,7 @@ export const DroppedElement: React.FC<{
   } | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const elementRef = useRef<HTMLDivElement>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
   // Local state for input values to prevent cursor jumping
   const [localValue, setLocalValue] = useState<
@@ -478,7 +490,7 @@ export const DroppedElement: React.FC<{
 
   // Increment render count on each render to help debug
   useEffect(() => {
-    setRenderCount(prev => prev + 1);
+    setRenderCount((prev) => prev + 1);
   }, []);
 
   // Adjust position based on parent scale and constrain to PDF area
@@ -490,20 +502,33 @@ export const DroppedElement: React.FC<{
     let posX = position.x;
     let posY = position.y;
 
-
     // Constrain to PDF dimensions if available
     if (pdfDimensions) {
       // Different constraints based on element type
       const elementWidth = type === "checkbox" ? 240 : 180;
       const elementHeight = type === "checkbox" ? 150 : 50;
-      
+
       // Ensure element stays within bounds
-      posX = Math.max(0, Math.min(posX, pdfDimensions.width / parentScale - elementWidth));
-      posY = Math.max(0, Math.min(posY, pdfDimensions.height / parentScale - elementHeight));
+      posX = Math.max(
+        0,
+        Math.min(posX, pdfDimensions.width / parentScale - elementWidth)
+      );
+      posY = Math.max(
+        0,
+        Math.min(posY, pdfDimensions.height / parentScale - elementHeight)
+      );
     }
 
     return { x: posX, y: posY };
-  }, [position?.x, position?.y, pdfDimensions, type, parentScale, id, renderCount]);
+  }, [
+    position?.x,
+    position?.y,
+    pdfDimensions,
+    type,
+    parentScale,
+    id,
+    renderCount,
+  ]);
 
   // Handle local input value changes
   const handleLocalInputChange = (
@@ -532,45 +557,62 @@ export const DroppedElement: React.FC<{
     }
   };
 
+  // Handle configuration changes
+  const handleConfigChange = (config: FormElementConfigData) => {
+    setShowConfig(false);
+    if (onConfigChange) {
+      onConfigChange(config);
+    }
+  };
+
+  // Close config modal
+  const handleCloseConfig = () => {
+    setShowConfig(false);
+  };
+
   // Use useMemo to create a stable reference for the style object
-  const style = useMemo<CSSProperties>(
-    () => {
-      
-      return {
-        position: "absolute",
-        top: adjustedPosition.y * parentScale,
-        left: adjustedPosition.x * parentScale,
-        zIndex: isDragging ? 1000 : 20, // Higher z-index to ensure visibility over PDF
-        // For checkbox, textarea and dropdown, we should use fit-content
-        width: type === "checkbox" ? "fit-content" : "calc(100% - 20px)",
-        maxWidth: type === "checkbox" ? "280px" : `${180 * parentScale}px`, // Scale the max width
-        transform: transform
-          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-          : undefined,
-        opacity: isDragging ? 0.4 : 1, // Lower opacity when dragging to show it's being moved
-        // Add transition for smooth scaling
-        transition: "font-size 0.2s, max-width 0.2s", 
-        fontSize: `${14 * parentScale}px`, // Scale the font size
-      };
-    },
-    [
-      adjustedPosition.x,
-      adjustedPosition.y,
-      transform?.x,
-      transform?.y,
-      isDragging,
-      parentScale,
-      scrollOffset,
-      type,
-      id,
-      renderCount,
-    ]
-  );
+  const style = useMemo<CSSProperties>(() => {
+    return {
+      position: "absolute",
+      top: adjustedPosition.y * parentScale,
+      left: adjustedPosition.x * parentScale,
+      zIndex: isDragging ? 1000 : 20, // Higher z-index to ensure visibility over PDF
+      // For checkbox, textarea and dropdown, we should use fit-content
+      width: type === "checkbox" ? "fit-content" : "calc(100% - 20px)",
+      maxWidth: type === "checkbox" ? "280px" : `${180 * parentScale}px`, // Scale the max width
+      transform: transform
+        ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+        : undefined,
+      opacity: isDragging ? 0.4 : 1, // Lower opacity when dragging to show it's being moved
+      // Add transition for smooth scaling
+      transition: "font-size 0.2s, max-width 0.2s",
+      fontSize: `${14 * parentScale}px`, // Scale the font size
+    };
+  }, [
+    adjustedPosition.x,
+    adjustedPosition.y,
+    transform?.x,
+    transform?.y,
+    isDragging,
+    parentScale,
+    scrollOffset,
+    type,
+    id,
+    renderCount,
+  ]);
 
   // Add delete button to the formHandle
   const formHandle = useMemo(
     () => (
       <div className="flex items-center">
+        <button
+          type="button"
+          onClick={onConfigClick || (() => setShowConfig(true))}
+          className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 text-blue-600 mr-1"
+          title="ตั้งค่า"
+        >
+          <FiSettings className="w-4 h-4" />
+        </button>
         <div
           className="p-2 bg-blue-100 rounded-full cursor-move flex justify-between items-center"
           {...listeners}
@@ -591,155 +633,222 @@ export const DroppedElement: React.FC<{
         )}
       </div>
     ),
-    [attributes, listeners, onDelete]
+    [attributes, listeners, onDelete, onConfigClick]
   );
 
   // The wrapper for all components - use React.memo to prevent unnecessary re-renders
   const FormElementWrapper = useMemo(() => {
     const Wrapper = React.memo(
       ({ children }: { children: React.ReactNode }) => (
-        <div
-          ref={(node) => {
-            // Combine refs
-            setNodeRef(node);
-            if (elementRef.current !== node) {
-              elementRef.current = node as HTMLDivElement | null;
-            }
-          }}
-          style={style}
-          className="mb-4"
-          suppressHydrationWarning
-        >
-          <div className="flex items-end gap-1 justify-between">
-            <div style={{ flex: 1 }}>{children}</div>
-            <div>{formHandle}</div>
+        <>
+          <div
+            ref={(node) => {
+              // Combine refs
+              setNodeRef(node);
+              if (elementRef.current !== node) {
+                elementRef.current = node as HTMLDivElement | null;
+              }
+            }}
+            style={style}
+            className="mb-4"
+            suppressHydrationWarning
+          >
+            <div className="flex items-end gap-1 justify-between">
+              <div style={{ flex: 1 }}>{children}</div>
+              <div>{formHandle}</div>
+            </div>
           </div>
-        </div>
+
+          {showConfig && (
+            <div className="fixed top-1/2 right-0 -translate-y-1/2 z-50">
+              <FormElementConfig
+                id={id}
+                type={type}
+                label={label}
+                checkboxOptions={checkboxOptions}
+                maxLength={maxLength}
+                required={required}
+                placeholder={placeholder}
+                onConfigChange={handleConfigChange}
+                onClose={handleCloseConfig}
+              />
+            </div>
+            )}
+        </>
       )
     );
     Wrapper.displayName = "FormElementWrapper";
     return Wrapper;
-  }, [formHandle, setNodeRef, style]);
+  }, [
+    formHandle,
+    setNodeRef,
+    style,
+    showConfig,
+    id,
+    type,
+    label,
+    value,
+    checkboxOptions,
+    maxLength,
+    required,
+    placeholder,
+  ]);
 
   // Render different form elements based on type
   switch (type) {
     case "text":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-input`}>{label}</label>
+          <label htmlFor={`${id}-input`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-input`}
             type="text"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={`กรอก${label.toLowerCase()}`}
+            placeholder={placeholder || `กรอก${label.toLowerCase()}`}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            maxLength={maxLength}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "name":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-input`}>{label}</label>
+          <label htmlFor={`${id}-input`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-input`}
             type="text"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="กรอกชื่อ-นามสกุล"
+            placeholder={placeholder || "กรอกชื่อ-นามสกุล"}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            maxLength={maxLength}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "email":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-input`}>{label}</label>
+          <label htmlFor={`${id}-input`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-input`}
             type="email"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="example@email.com"
+            placeholder={placeholder || "example@email.com"}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            maxLength={maxLength}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "phone":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-input`}>{label}</label>
+          <label htmlFor={`${id}-input`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-input`}
             type="tel"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="0xx-xxx-xxxx"
+            placeholder={placeholder || "0xx-xxx-xxxx"}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            maxLength={maxLength}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "number":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-input`}>{label}</label>
+          <label htmlFor={`${id}-input`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-input`}
             type="number"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="กรอกตัวเลข"
+            placeholder={placeholder || "กรอกตัวเลข"}
             value={(localValue as number) ?? ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "textarea":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-textarea`}>{label}</label>
+          <label htmlFor={`${id}-textarea`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <textarea
             id={`${id}-textarea`}
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={3}
-            placeholder="กรอกข้อความที่นี่"
+            placeholder={placeholder || "กรอกข้อความที่นี่"}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            maxLength={maxLength}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "date":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-date`}>{label}</label>
+          <label htmlFor={`${id}-date`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <input
             id={`${id}-date`}
             type="date"
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             title={label}
-            placeholder={`กรอก${label.toLowerCase()}`}
+            placeholder={placeholder || `กรอก${label.toLowerCase()}`}
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
+            required={required}
           />
         </FormElementWrapper>
       );
     case "select":
       return (
         <FormElementWrapper>
-          <label htmlFor={`${id}-select`}>{label}</label>
+          <label htmlFor={`${id}-select`} className="flex items-center">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
           <select
             id={`${id}-select`}
             className="w-full max-w-[200px] px-3 py-2 border border-gray-300 bg-white/90 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -748,11 +857,20 @@ export const DroppedElement: React.FC<{
             value={(localValue as string) || ""}
             onChange={handleLocalInputChange}
             onBlur={handleInputBlur}
+            required={required}
           >
-            <option value="">เลือกตัวเลือก</option>
-            <option value="option1">ตัวเลือกที่ 1</option>
-            <option value="option2">ตัวเลือกที่ 2</option>
-            <option value="option3">ตัวเลือกที่ 3</option>
+            <option value="">{placeholder || "เลือกตัวเลือก"}</option>
+            {localCheckboxOptions?.map((option, index) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            )) || (
+              <>
+                <option value="option1">ตัวเลือกที่ 1</option>
+                <option value="option2">ตัวเลือกที่ 2</option>
+                <option value="option3">ตัวเลือกที่ 3</option>
+              </>
+            )}
           </select>
         </FormElementWrapper>
       );
@@ -760,8 +878,12 @@ export const DroppedElement: React.FC<{
       return (
         <FormElementWrapper>
           <div className="bg-white/90 p-2 rounded-md w-full">
-            <label htmlFor={`${id}-checkbox`} className="block mb-2">
+            <label
+              htmlFor={`${id}-checkbox`}
+              className="block mb-2 flex items-center"
+            >
               {label}
+              {required && <span className="text-red-500 ml-1">*</span>}
             </label>
             <CheckboxOptions
               id={id}
